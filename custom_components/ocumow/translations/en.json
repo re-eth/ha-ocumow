@@ -36,7 +36,9 @@
   },
   "entity": {
     "binary_sensor": {
-      "rain_sensor_enabled": {"name": "Rain sensor enabled"}
+      "online": {"name": "Online"},
+      "rain_sensor_enabled": {"name": "Rain sensor enabled"},
+      "stopped": {"name": "Stopped"}
     },
     "button": {
       "reset_blade_time": {"name": "Reset blade time"}
