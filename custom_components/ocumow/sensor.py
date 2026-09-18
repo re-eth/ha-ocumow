@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
@@ -20,6 +21,16 @@ from .entity import OcuMowEntity
 class OcuMowSensorDescription(SensorEntityDescription):
     property_keys: tuple[str, ...]
     value_fn: Callable[[Any], Any] = lambda value: value
+
+
+def milliseconds_to_datetime(value: Any) -> datetime | None:
+    """Convert a millisecond Unix timestamp into a UTC datetime."""
+    if value in (None, ""):
+        return None
+    try:
+        return datetime.fromtimestamp(float(value) / 1000, tz=UTC)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 SENSORS: tuple[OcuMowSensorDescription, ...] = (
@@ -71,6 +82,22 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
     ),
     OcuMowSensorDescription(
         key="firmware", translation_key="firmware", property_keys=("AllFirmwareVer",),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    OcuMowSensorDescription(
+        key="last_online",
+        translation_key="last_online",
+        property_keys=("tsLastOnlineTime",),
+        value_fn=milliseconds_to_datetime,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    OcuMowSensorDescription(
+        key="last_offline",
+        translation_key="last_offline",
+        property_keys=("tsLastOfflineTime",),
+        value_fn=milliseconds_to_datetime,
+        device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
 )

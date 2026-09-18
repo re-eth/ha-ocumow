@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Final
@@ -13,9 +14,13 @@ from .const import (
     API_DEVICE_LIST_PATH,
     API_DEVICE_PROPERTIES_PATH,
     API_LOGIN_PATH,
+    API_SUB_DEVICE_LIST_PATH,
     API_USER_DOMAIN,
     API_USER_DOMAIN_SECRET,
+    COMMAND_MESSAGE_IDS,
     DEFAULT_API_BASE_URL,
+    DEFAULT_WEBSOCKET_URL,
+    DEVICE_LIVE_PROPERTIES,
     DEVICE_STATISTIC_PROPERTIES,
 )
 
@@ -86,12 +91,16 @@ class OcuMowApi:
         password: str,
         *,
         base_url: str = DEFAULT_API_BASE_URL,
+        websocket_url: str = DEFAULT_WEBSOCKET_URL,
     ) -> None:
         self._session = session
         self._email = email
         self._password = password
         self._base_url = base_url.rstrip("/")
+        self._websocket_url = websocket_url
         self._access_token: str | None = None
+        self._command_device_key: str | None = None
+        self._command_product_key: str | None = None
 
     async def async_login(self) -> None:
         """Authenticate using the endpoint and field names found in the APK."""
@@ -119,12 +128,48 @@ class OcuMowApi:
             raise OcuMowApiError("Device response did not contain an object")
 
         properties = extract_properties(payload)
+        raw = dict(payload)
+        statistics_device_id = device_id
+
+        try:
+            sub_devices_response = await self._async_request(
+                "GET",
+                API_SUB_DEVICE_LIST_PATH,
+                params={
+                    "gateWayDeviceId": device_id,
+                    "pageNum": 1,
+                    "pageSize": 10,
+                    "tslPropertiesCodeStr": ",".join(
+                        (*DEVICE_LIVE_PROPERTIES, *DEVICE_STATISTIC_PROPERTIES)
+                    ),
+                },
+            )
+        except OcuMowApiError:
+            pass
+        else:
+            rows = find_first_key(sub_devices_response, ("rows",))
+            if isinstance(rows, list):
+                sub_device = next(
+                    (item for item in rows if isinstance(item, dict)), None
+                )
+                if sub_device is not None:
+                    raw["subDevice"] = sub_device
+                    properties.update(extract_properties(sub_device))
+                    sub_device_id = find_first_key(sub_device, ("deviceId",))
+                    if sub_device_id is not None:
+                        statistics_device_id = str(sub_device_id)
+                    device_key = find_first_key(sub_device, ("deviceKey",))
+                    product_key = find_first_key(sub_device, ("productKey",))
+                    if device_key is not None and product_key is not None:
+                        self._command_device_key = str(device_key)
+                        self._command_product_key = str(product_key)
+
         try:
             statistics_response = await self._async_request(
                 "GET",
                 API_DEVICE_PROPERTIES_PATH,
                 params={
-                    "deviceId": device_id,
+                    "deviceId": statistics_device_id,
                     "tslPropertiesCodeStr": ",".join(DEVICE_STATISTIC_PROPERTIES),
                 },
             )
@@ -140,8 +185,51 @@ class OcuMowApi:
             device_id=device_id,
             name=str(discovered_name or name),
             properties=properties,
-            raw=payload,
+            raw=raw,
         )
+
+    async def async_send_command(self, command: str) -> None:
+        """Send a mower command using the WebSocket payload used by the app."""
+        message_id = COMMAND_MESSAGE_IDS.get(command)
+        if message_id is None:
+            raise OcuMowApiError(f"Unsupported mower command: {command}")
+        if self._command_device_key is None or self._command_product_key is None:
+            raise OcuMowApiError("Mower command details have not been discovered")
+
+        target = {
+            "productKey": self._command_product_key,
+            "deviceKey": self._command_device_key,
+        }
+        subscription = {
+            "cmd": "subscribe",
+            "data": [
+                target,
+                {"messageType": ["ONLINE", "STATUS", "RAW-UPLINK"]},
+            ],
+        }
+        attribute = {
+            "id": 30,
+            "name": "Command",
+            "type": "ENUM",
+            "value": command,
+        }
+        request = {
+            "cmd": "send",
+            "data": {
+                **target,
+                "type": "WRITE-ATTR",
+                "msgId": message_id,
+                # The Android app sends this array encoded as a JSON string.
+                "kv": json.dumps([attribute], separators=(",", ":")),
+            },
+        }
+
+        try:
+            async with self._session.ws_connect(self._websocket_url) as websocket:
+                await websocket.send_json(subscription)
+                await websocket.send_json(request)
+        except (ClientError, TimeoutError) as err:
+            raise OcuMowConnectionError(str(err)) from err
 
     async def async_get_devices(self) -> list[OcuMowDevice]:
         """Return the mowers associated with the logged-in account."""
@@ -294,6 +382,8 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
     for key in (
         "properties",
         "property",
+        "propertyList",
+        "tslProperties",
         "thingModel",
         "deviceData",
         "statusData",

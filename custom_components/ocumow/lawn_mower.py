@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from homeassistant.components.lawn_mower import LawnMowerActivity, LawnMowerEntity
+from homeassistant.components.lawn_mower import (
+    LawnMowerActivity,
+    LawnMowerEntity,
+    LawnMowerEntityFeature,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import OcuMowConfigEntry
+from .const import COMMAND_DOCK, COMMAND_PAUSE, COMMAND_START
 from .entity import OcuMowEntity
 
 
@@ -25,6 +30,11 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
     """
 
     _attr_translation_key = "mower"
+    _attr_supported_features = (
+        LawnMowerEntityFeature.START_MOWING
+        | LawnMowerEntityFeature.PAUSE
+        | LawnMowerEntityFeature.DOCK
+    )
 
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator)
@@ -59,6 +69,21 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
             "raw_status": self.device.get("Status", "deviceStatus", "runningStatus"),
             "mode": self.device.get("Mode"),
         }
+
+    async def async_start_mowing(self) -> None:
+        """Start or resume mowing."""
+        await self.coordinator.api.async_send_command(COMMAND_START)
+        await self.coordinator.async_request_refresh()
+
+    async def async_pause(self) -> None:
+        """Pause mowing."""
+        await self.coordinator.api.async_send_command(COMMAND_PAUSE)
+        await self.coordinator.async_request_refresh()
+
+    async def async_dock(self) -> None:
+        """Return the mower to its charging station."""
+        await self.coordinator.api.async_send_command(COMMAND_DOCK)
+        await self.coordinator.async_request_refresh()
 
     @property
     def available(self) -> bool:

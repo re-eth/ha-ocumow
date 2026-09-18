@@ -48,7 +48,9 @@
       "running_time": {"name": "Running time"},
       "blade_time": {"name": "Blade time"},
       "distance": {"name": "Distance"},
-      "firmware": {"name": "Firmware"}
+      "firmware": {"name": "Firmware"},
+      "last_online": {"name": "Last online"},
+      "last_offline": {"name": "Last offline"}
     }
   }
 }
