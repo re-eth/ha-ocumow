@@ -90,6 +90,12 @@ def nested_value(value: Any, key: str) -> Any:
     """Find a case-insensitive key inside a structured cloud property."""
     value = decode_cloud_json(value)
     if isinstance(value, dict):
+        lowered = {str(item_key).casefold(): item for item_key, item in value.items()}
+        property_name = lowered.get("code", lowered.get("name"))
+        if str(property_name).casefold() == key.casefold():
+            for value_key in ("attributevalue", "value", "propertyvalue", "val"):
+                if value_key in lowered:
+                    return decode_cloud_json(lowered[value_key])
         for item_key, item_value in value.items():
             if str(item_key).casefold() == key.casefold():
                 return decode_cloud_json(item_value)
@@ -137,6 +143,10 @@ def normalise_schedule(value: Any) -> list[dict[str, Any]]:
             continue
         valid_value = lowered.get("validflag", lowered.get("valid", True))
         enabled = valid_value is True or str(valid_value).casefold() in ("1", "true")
+        # The mower pads its weekly array with enabled-looking zero-length
+        # records. The app does not present these as actual mowing periods.
+        if start_hour == end_hour and start_minute == end_minute:
+            continue
         # The app stores Monday-Saturday as 1-6 and Sunday as 0.
         weekday = 6 if week == 0 else week - 1
         if not 0 <= weekday <= 6:

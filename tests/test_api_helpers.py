@@ -120,6 +120,20 @@ def test_extract_sub_device_tsl_properties() -> None:
     assert extract_properties(payload) == {"Soc": "84", "Status": "1"}
 
 
+def test_extract_structured_property_specs() -> None:
+    specs = [
+        {"code": "RainSwitch", "attributeValue": True},
+        {"code": "DelayWorkingTime", "attributeValue": 2},
+    ]
+    payload = {
+        "data": [
+            {"code": "RainSet", "dataType": "STRUCT", "specs": specs},
+        ]
+    }
+
+    assert extract_properties(payload) == {"RainSet": specs}
+
+
 def test_device_get_falls_back_to_raw_gateway_fields() -> None:
     device = OcuMowDevice(
         device_id="5599",

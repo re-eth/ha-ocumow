@@ -580,10 +580,20 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(item, dict):
                     continue
                 name = find_first_key(item, ("code", "key", "name", "propertyCode"))
-                item_value = find_first_key(
-                    item,
-                    ("value", "val", "propertyValue", "attributeValue", "data"),
+                item_value = next(
+                    (
+                        item[key]
+                        for key in (
+                            "value", "val", "propertyValue", "attributeValue", "data"
+                        )
+                        if key in item
+                    ),
+                    None,
                 )
+                # Structured settings such as RainSet keep their live values
+                # in named specs rather than in a top-level attributeValue.
+                if item_value is None and isinstance(item.get("specs"), list):
+                    item_value = item["specs"]
                 if name is not None:
                     converted[str(name)] = item_value
             if converted:
