@@ -37,6 +37,13 @@ logger:
     custom_components.ocumow: debug
 ```
 
+## Before publishing this repository
+
+Replace every `YOUR_GITHUB_USERNAME` value in `manifest.json` with the real
+GitHub username.
+Add a repository topic of `home-assistant` and create a GitHub release whose
+tag matches the version in `manifest.json`.
+
 ## Known limitations
 
 - This integration currently depends on the Cleva/Quectel cloud path. It is

@@ -1,6 +1,27 @@
 """Tests for vendor-response normalisation that do not require hardware."""
 
-from custom_components.ocumow.api import extract_properties, find_first_key, unwrap_envelope
+from hashlib import sha256
+
+from custom_components.ocumow.api import (
+    build_login_payload,
+    extract_properties,
+    find_first_key,
+    unwrap_envelope,
+)
+from custom_components.ocumow.const import API_USER_DOMAIN, API_USER_DOMAIN_SECRET
+
+
+def test_build_login_payload_matches_apk_algorithm() -> None:
+    payload = build_login_payload("owner@example.com", "secret")
+
+    assert payload == {
+        "email": "owner@example.com",
+        "pwd": "secret",
+        "signature": sha256(
+            f"owner@example.comsecret{API_USER_DOMAIN_SECRET}".encode()
+        ).hexdigest(),
+        "userDomain": API_USER_DOMAIN,
+    }
 
 
 def test_find_nested_token() -> None:

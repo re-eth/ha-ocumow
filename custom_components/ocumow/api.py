@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from hashlib import sha256
 from typing import Any, Final
 
 from aiohttp import ClientError, ClientResponse, ClientSession
 
-from .const import API_DEVICE_INFO_PATH, API_LOGIN_PATH, DEFAULT_API_BASE_URL
+from .const import (
+    API_DEVICE_INFO_PATH,
+    API_LOGIN_PATH,
+    API_USER_DOMAIN,
+    API_USER_DOMAIN_SECRET,
+    DEFAULT_API_BASE_URL,
+)
 
 
 class OcuMowError(Exception):
@@ -75,7 +82,7 @@ class OcuMowApi:
         response = await self._async_request(
             "POST",
             API_LOGIN_PATH,
-            json={"email": self._email, "password": self._password},
+            json=build_login_payload(self._email, self._password),
             authenticated=False,
         )
         token = find_first_key(response, TOKEN_KEYS)
@@ -112,15 +119,14 @@ class OcuMowApi:
         authenticated: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        headers = {"Accept": "application/json"}
+        headers = {
+            "Accept": "application/json",
+            "Accept-Language": "en-US",
+            "Content-Type": "application/json; charset=UTF-8",
+        }
         if authenticated and self._access_token:
-            # APK/API revisions have used both bearer and explicit token headers.
-            headers.update(
-                {
-                    "Authorization": f"Bearer {self._access_token}",
-                    "Access-Token": self._access_token,
-                }
-            )
+            # OcuMow 1.3.15 sends the access token verbatim in this header.
+            headers["token"] = self._access_token
         try:
             async with self._session.request(
                 method,
@@ -154,6 +160,19 @@ class OcuMowApi:
                 raise OcuMowAuthError(str(message))
             raise OcuMowApiError(f"{message} (code {code})")
         return result
+
+
+def build_login_payload(email: str, password: str) -> dict[str, str]:
+    """Build the signed email-login body used by OcuMow Android 1.3.15."""
+    signature = sha256(
+        f"{email}{password}{API_USER_DOMAIN_SECRET}".encode()
+    ).hexdigest()
+    return {
+        "email": email,
+        "pwd": password,
+        "signature": signature,
+        "userDomain": API_USER_DOMAIN,
+    }
 
 
 def unwrap_envelope(value: Any) -> Any:
