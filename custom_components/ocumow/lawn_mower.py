@@ -44,6 +44,16 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         docked = self.device.get("ConnectStationStates", "BatteryStates")
         stopped = self.device.get("DeviceStoped")
 
+        # Error 183 means the mower is outside its permitted mowing time. The
+        # app treats this as an operating restriction rather than a hardware
+        # failure, so represent it as paused while the Fault sensor preserves
+        # the reason.
+        try:
+            if int(fault) == 183:
+                return LawnMowerActivity.PAUSED
+        except (TypeError, ValueError):
+            pass
+
         if is_active(fault):
             return LawnMowerActivity.ERROR
 
