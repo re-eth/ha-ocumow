@@ -592,7 +592,13 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
                 )
                 # Structured settings such as RainSet keep their live values
                 # in named specs rather than in a top-level attributeValue.
-                if item_value is None and isinstance(item.get("specs"), list):
+                if (
+                    isinstance(item.get("specs"), list)
+                    and (
+                        item_value in (None, "")
+                        or str(item.get("dataType", "")).casefold() == "struct"
+                    )
+                ):
                     item_value = item["specs"]
                 if name is not None:
                     converted[str(name)] = item_value

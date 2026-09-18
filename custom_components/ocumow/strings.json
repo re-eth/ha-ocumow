@@ -47,7 +47,7 @@
       "status": {"name": "Status"},
       "signal_quality": {"name": "Signal quality"},
       "fault": {"name": "Fault"},
-      "area": {"name": "Area"},
+      "area": {"name": "Mowing area"},
       "mainboard_temperature": {"name": "Mainboard temperature"},
       "battery_temperature": {"name": "Battery temperature"},
       "working_time": {"name": "Startup time"},

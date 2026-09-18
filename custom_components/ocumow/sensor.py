@@ -12,7 +12,6 @@ import unicodedata
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.const import (
     PERCENTAGE,
-    UnitOfArea,
     UnitOfLength,
     UnitOfTemperature,
     UnitOfTime,
@@ -60,6 +59,14 @@ def to_integer(value: Any) -> int | None:
         return int(float(value))
     except (TypeError, ValueError, OverflowError):
         return None
+
+
+def mowing_area_label(value: Any) -> str | None:
+    """Translate the mower's area selector to the labels used by the app."""
+    area = to_integer(value)
+    if area is None:
+        return None
+    return {0: "Main", 1: "Other"}.get(area, f"Unknown ({area})")
 
 
 def clean_text(value: Any) -> str | None:
@@ -322,8 +329,8 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
     ),
     OcuMowSensorDescription(
         key="area", translation_key="area", property_keys=("Area",),
-        icon="mdi:ruler-square",
-        native_unit_of_measurement=UnitOfArea.SQUARE_METERS,
+        value_fn=mowing_area_label,
+        icon="mdi:map-marker-radius-outline",
     ),
     OcuMowSensorDescription(
         key="mainboard_temperature", translation_key="mainboard_temperature",
@@ -432,9 +439,10 @@ class OcuMowSensor(OcuMowEntity, SensorEntity):
     @property
     def native_value(self) -> Any:
         value = self.device.get(*self.entity_description.property_keys)
-        if isinstance(value, (dict, list)):
-            return str(value)
-        return self.entity_description.value_fn(value)
+        converted = self.entity_description.value_fn(value)
+        if isinstance(converted, (dict, list)):
+            return str(converted)
+        return converted
 
 
 class OcuMowScheduleSensor(OcuMowEntity, SensorEntity):

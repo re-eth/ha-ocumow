@@ -38,6 +38,7 @@ DEVICE_LIVE_PROPERTIES = (
     "PinCode",
     "Soc",
     "Status",
+    "Area",
     "SignalQuality",
     "Fault",
 )
