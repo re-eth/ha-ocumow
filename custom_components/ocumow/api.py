@@ -283,13 +283,48 @@ class OcuMowApi:
 
         try:
             async with self._session.ws_connect(self._websocket_url) as websocket:
-                await websocket.send_json(subscription)
-                # The app sends commands over a long-lived, already-subscribed
-                # socket. Wait for the cloud to acknowledge our fresh
-                # subscription before sending anything to the mower.
-                await self._async_wait_for_websocket(
-                    websocket, timeout=3, response_required=False
+                # OcuMow authenticates the WebSocket separately from the REST
+                # API, then subscribes only after login_resp reports success.
+                login = {"cmd": "login", "data": {"token": self._access_token}}
+                await websocket.send_str(json.dumps(login, separators=(",", ":")))
+                login_response = await self._async_wait_for_named_response(
+                    websocket, expected_cmd="login_resp", timeout=5
                 )
+                login_data = login_response.get("data")
+                if (
+                    not isinstance(login_data, dict)
+                    or login_data.get("code") not in (1, "1")
+                ):
+                    detail = login_data.get("msg") if isinstance(login_data, dict) else None
+                    self.last_command_result = f"WebSocket login failed: {detail or 'unknown error'}"
+                    raise OcuMowAuthError(self.last_command_result)
+
+                await websocket.send_str(
+                    json.dumps(subscription, separators=(",", ":"))
+                )
+                subscribe_response = await self._async_wait_for_named_response(
+                    websocket, expected_cmd="subscribe_resp", timeout=5
+                )
+                subscribe_data = subscribe_response.get("data")
+                subscription_result = (
+                    subscribe_data[0]
+                    if isinstance(subscribe_data, list) and subscribe_data
+                    else None
+                )
+                if (
+                    not isinstance(subscription_result, dict)
+                    or subscription_result.get("code") not in (1, "1")
+                ):
+                    detail = (
+                        subscription_result.get("msg")
+                        if isinstance(subscription_result, dict)
+                        else None
+                    )
+                    self.last_command_result = (
+                        f"WebSocket subscription failed: {detail or 'unknown error'}"
+                    )
+                    raise OcuMowApiError(self.last_command_result)
+
                 # Match JSONObject.toString() from the Android app exactly.
                 await websocket.send_str(json.dumps(request, separators=(",", ":")))
                 # Allow the cloud to acknowledge or reject the write before
@@ -300,6 +335,31 @@ class OcuMowApi:
         except (ClientError, TimeoutError) as err:
             self.last_command_result = f"Connection error: {err}"
             raise OcuMowConnectionError(str(err)) from err
+
+    async def _async_wait_for_named_response(
+        self, websocket, *, expected_cmd: str, timeout: float
+    ) -> dict[str, Any]:
+        """Wait for a specific protocol response, ignoring other messages."""
+        deadline = asyncio.get_running_loop().time() + timeout
+        while (remaining := deadline - asyncio.get_running_loop().time()) > 0:
+            try:
+                message = await websocket.receive(timeout=remaining)
+            except asyncio.TimeoutError:
+                break
+            if message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
+                detail = websocket.exception() or "WebSocket closed unexpectedly"
+                raise OcuMowConnectionError(str(detail))
+            if message.type != WSMsgType.TEXT:
+                continue
+            try:
+                response = json.loads(message.data)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(response, dict) and response.get("cmd") == expected_cmd:
+                return response
+        raise OcuMowApiError(
+            f"The OcuMow cloud did not return {expected_cmd}"
+        )
 
     async def _async_wait_for_command_ack(
         self, websocket, *, message_id: int, timeout: float
@@ -329,21 +389,22 @@ class OcuMowApi:
             if acknowledged_id is not None and str(acknowledged_id) != str(message_id):
                 continue
 
-            code = response.get("code", response.get("errorCode"))
-            message_text = response.get("message", response.get("msg"))
-            self.last_command_result = str(
-                message_text or ("Acknowledged" if code in (None, 0, "0", 200, "200") else code)
-            )
+            data = response.get("data")
+            if not isinstance(data, dict):
+                continue
+            status = data.get("status")
+            message_text = data.get("message", data.get("msg"))
+            self.last_command_result = str(message_text or status or "Acknowledged")
             _LOGGER.info(
-                "OcuMow command acknowledgement: msgId=%s code=%s message=%s",
+                "OcuMow command acknowledgement: msgId=%s status=%s message=%s",
                 message_id,
-                code,
+                status,
                 message_text,
             )
-            if code not in (None, 0, "0", 200, "200", "SUCCESS", "success"):
+            if str(status).casefold() != "succ":
                 raise OcuMowApiError(
                     f"Mower rejected the command: {message_text or 'unknown error'} "
-                    f"(code {code})"
+                    f"(status {status or 'unknown'})"
                 )
             return
 
@@ -351,52 +412,6 @@ class OcuMowApi:
         raise OcuMowApiError(
             "The OcuMow cloud did not acknowledge the mower command"
         )
-
-    async def _async_wait_for_websocket(
-        self,
-        websocket,
-        *,
-        timeout: float,
-        response_required: bool,
-    ) -> None:
-        """Wait for a WebSocket reply and expose command failures."""
-        try:
-            message = await websocket.receive(timeout=timeout)
-        except asyncio.TimeoutError:
-            if response_required:
-                raise OcuMowApiError(
-                    "The OcuMow cloud did not acknowledge the mower command"
-                )
-            return
-
-        if message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
-            detail = websocket.exception() or "WebSocket closed unexpectedly"
-            raise OcuMowConnectionError(str(detail))
-        if message.type != WSMsgType.TEXT:
-            return
-
-        try:
-            response = json.loads(message.data)
-        except (TypeError, ValueError):
-            _LOGGER.debug("OcuMow WebSocket returned a non-JSON response")
-            return
-        if not isinstance(response, dict):
-            return
-
-        code = response.get("code", response.get("errorCode"))
-        message_text = response.get("message", response.get("msg"))
-        _LOGGER.info(
-            "OcuMow WebSocket response: cmd=%s type=%s code=%s message=%s",
-            response.get("cmd"),
-            response.get("type"),
-            code,
-            message_text,
-        )
-        if code not in (None, 0, "0", 200, "200", "SUCCESS", "success"):
-            raise OcuMowApiError(
-                f"Mower rejected the command: {message_text or 'unknown error'} "
-                f"(code {code})"
-            )
 
     async def async_get_devices(self) -> list[OcuMowDevice]:
         """Return the mowers associated with the logged-in account."""
