@@ -24,10 +24,7 @@ async def async_setup_entry(
 
 
 class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
-    """Representation of an OcuMow mower.
-
-    Controls intentionally remain disabled until command payloads are verified.
-    """
+    """Representation of an OcuMow mower."""
 
     _attr_translation_key = "mower"
     _attr_supported_features = (
@@ -99,13 +96,6 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         """Return the mower to its charging station."""
         await self.coordinator.api.async_send_command(COMMAND_DOCK)
         await self.coordinator.async_request_refresh()
-
-    @property
-    def available(self) -> bool:
-        """Report availability from the gateway record returned by the cloud."""
-        online = self.device.get("onlineStatus")
-        return super().available and online not in (0, "0", False)
-
 
 def is_active(value: object) -> bool:
     """Interpret common truthy fault/stopped values."""

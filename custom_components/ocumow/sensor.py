@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+import unicodedata
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
 from homeassistant.const import (
@@ -33,6 +34,10 @@ def milliseconds_to_datetime(value: Any) -> datetime | None:
     """Convert a millisecond Unix timestamp into a UTC datetime."""
     if value in (None, ""):
         return None
+    try:
+        return datetime.fromtimestamp(float(value) / 1000, tz=UTC)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def seconds_to_whole_hours(value: Any) -> int | None:
@@ -49,6 +54,21 @@ def to_integer(value: Any) -> int | None:
     """Normalise an integer returned as either a number or a string."""
     if value in (None, ""):
         return None
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def clean_text(value: Any) -> str | None:
+    """Remove control and other non-printing characters from cloud text."""
+    if value in (None, ""):
+        return None
+    return "".join(
+        character
+        for character in str(value).strip()
+        if not unicodedata.category(character).startswith("C")
+    )
 
 
 STATUS_LABELS = {
@@ -75,14 +95,6 @@ def status_to_label(value: Any) -> str | None:
     except (TypeError, ValueError):
         return str(value)
     return STATUS_LABELS.get(status, f"Unknown ({status})")
-    try:
-        return int(float(value))
-    except (TypeError, ValueError, OverflowError):
-        return None
-    try:
-        return datetime.fromtimestamp(float(value) / 1000, tz=UTC)
-    except (TypeError, ValueError, OverflowError):
-        return None
 
 
 SENSORS: tuple[OcuMowSensorDescription, ...] = (
@@ -147,6 +159,7 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
     ),
     OcuMowSensorDescription(
         key="firmware", translation_key="firmware", property_keys=("AllFirmwareVer",),
+        value_fn=clean_text,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(

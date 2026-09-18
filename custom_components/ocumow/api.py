@@ -155,6 +155,15 @@ class OcuMowApi:
                 if sub_device is not None:
                     raw["subDevice"] = sub_device
                     properties.update(extract_properties(sub_device))
+                    for timestamp_key in (
+                        "tsLastOnlineTime",
+                        "tsLastOfflineTime",
+                    ):
+                        timestamp_value = find_first_key(
+                            sub_device, (timestamp_key,)
+                        )
+                        if timestamp_value is not None:
+                            properties[timestamp_key] = timestamp_value
                     sub_device_id = find_first_key(sub_device, ("deviceId",))
                     if sub_device_id is not None:
                         statistics_device_id = str(sub_device_id)
