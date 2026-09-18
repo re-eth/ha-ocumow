@@ -283,22 +283,34 @@ class OcuMowApi:
                 # The app sends commands over a long-lived, already-subscribed
                 # socket. Wait for the cloud to acknowledge our fresh
                 # subscription before sending anything to the mower.
-                await self._async_wait_for_websocket(websocket, timeout=3)
-                await websocket.send_json(request)
+                await self._async_wait_for_websocket(
+                    websocket, timeout=3, response_required=False
+                )
+                # Match JSONObject.toString() from the Android app exactly.
+                await websocket.send_str(json.dumps(request, separators=(",", ":")))
                 # Allow the cloud to acknowledge or reject the write before
                 # closing the short-lived Home Assistant connection.
-                await self._async_wait_for_websocket(websocket, timeout=3)
+                await self._async_wait_for_websocket(
+                    websocket, timeout=5, response_required=True
+                )
         except (ClientError, TimeoutError) as err:
             raise OcuMowConnectionError(str(err)) from err
 
-    async def _async_wait_for_websocket(self, websocket, *, timeout: float) -> None:
+    async def _async_wait_for_websocket(
+        self,
+        websocket,
+        *,
+        timeout: float,
+        response_required: bool,
+    ) -> None:
         """Wait for a WebSocket reply and expose command failures."""
         try:
             message = await websocket.receive(timeout=timeout)
         except asyncio.TimeoutError:
-            # Some firmware/cloud combinations do not acknowledge every
-            # message. Waiting still gives the subscription/write time to be
-            # processed, so a timeout alone is not a command failure.
+            if response_required:
+                raise OcuMowApiError(
+                    "The OcuMow cloud did not acknowledge the mower command"
+                )
             return
 
         if message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
@@ -317,7 +329,7 @@ class OcuMowApi:
 
         code = response.get("code", response.get("errorCode"))
         message_text = response.get("message", response.get("msg"))
-        _LOGGER.debug(
+        _LOGGER.info(
             "OcuMow WebSocket response: cmd=%s type=%s code=%s message=%s",
             response.get("cmd"),
             response.get("type"),
