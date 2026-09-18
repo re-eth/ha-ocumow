@@ -8,5 +8,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/re-eth/ha-ocumow/issues",
   "requirements": [],
-  "version": "0.1.0-alpha.1"
+  "version": "0.1.0-alpha.2"
 }

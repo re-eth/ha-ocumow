@@ -11,7 +11,7 @@ CONF_DEVICE_NAME = "device_name"
 DEFAULT_API_BASE_URL = "https://api.clevarobot.com/v2"
 DEFAULT_WEBSOCKET_URL = "wss://iot-ws.quecteleu.com/ws/v1"
 DEFAULT_DEVICE_NAME = "OcuMow"
-DEFAULT_SCAN_INTERVAL = timedelta(seconds=30)
+DEFAULT_SCAN_INTERVAL = timedelta(minutes=1)
 
 API_LOGIN_PATH = "/enduser/app/user/emailPwdLogin"
 API_REFRESH_PATH = "/enduser/app/user/refreshToken"
