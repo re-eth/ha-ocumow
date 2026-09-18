@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Final
 
-from aiohttp import ClientError, ClientResponse, ClientSession
+from aiohttp import ClientError, ClientResponse, ClientSession, WSMsgType
 
 from .const import (
     API_DEVICE_INFO_PATH,
@@ -59,6 +60,8 @@ AUTH_ERROR_CODES: Final = {
     "1002",
     "40014",
 }
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -277,14 +280,55 @@ class OcuMowApi:
         try:
             async with self._session.ws_connect(self._websocket_url) as websocket:
                 await websocket.send_json(subscription)
-                # The Android app keeps one socket open and subscribes before
-                # commands are sent. Give the cloud time to register a fresh
-                # short-lived subscription before sending the command.
-                await asyncio.sleep(0.25)
+                # The app sends commands over a long-lived, already-subscribed
+                # socket. Wait for the cloud to acknowledge our fresh
+                # subscription before sending anything to the mower.
+                await self._async_wait_for_websocket(websocket, timeout=3)
                 await websocket.send_json(request)
-                await asyncio.sleep(0.5)
+                # Allow the cloud to acknowledge or reject the write before
+                # closing the short-lived Home Assistant connection.
+                await self._async_wait_for_websocket(websocket, timeout=3)
         except (ClientError, TimeoutError) as err:
             raise OcuMowConnectionError(str(err)) from err
+
+    async def _async_wait_for_websocket(self, websocket, *, timeout: float) -> None:
+        """Wait for a WebSocket reply and expose command failures."""
+        try:
+            message = await websocket.receive(timeout=timeout)
+        except asyncio.TimeoutError:
+            # Some firmware/cloud combinations do not acknowledge every
+            # message. Waiting still gives the subscription/write time to be
+            # processed, so a timeout alone is not a command failure.
+            return
+
+        if message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
+            detail = websocket.exception() or "WebSocket closed unexpectedly"
+            raise OcuMowConnectionError(str(detail))
+        if message.type != WSMsgType.TEXT:
+            return
+
+        try:
+            response = json.loads(message.data)
+        except (TypeError, ValueError):
+            _LOGGER.debug("OcuMow WebSocket returned a non-JSON response")
+            return
+        if not isinstance(response, dict):
+            return
+
+        code = response.get("code", response.get("errorCode"))
+        message_text = response.get("message", response.get("msg"))
+        _LOGGER.debug(
+            "OcuMow WebSocket response: cmd=%s type=%s code=%s message=%s",
+            response.get("cmd"),
+            response.get("type"),
+            code,
+            message_text,
+        )
+        if code not in (None, 0, "0", 200, "200", "SUCCESS", "success"):
+            raise OcuMowApiError(
+                f"Mower rejected the command: {message_text or 'unknown error'} "
+                f"(code {code})"
+            )
 
     async def async_get_devices(self) -> list[OcuMowDevice]:
         """Return the mowers associated with the logged-in account."""

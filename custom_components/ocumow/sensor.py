@@ -85,6 +85,71 @@ STATUS_LABELS = {
     10: "Borderless signalling",
 }
 
+FAULT_LABELS = {
+    0: "No fault",
+    49: "Wheel slipping",
+    53: "Control system error",
+    54: "Control system error",
+    55: "Outside border",
+    56: "Control system error",
+    57: "Control system error",
+    65: "Battery error",
+    67: "Battery error",
+    76: "Mower lifted",
+    77: "Motor fault",
+    82: "Rolling over",
+    83: "Battery temperature too hot/cold",
+    84: "Mower tilted",
+    88: "Mower blocked",
+    97: "Stop button error",
+    98: "Control system error",
+    99: "Stop button error",
+    100: "Rain sensor triggered",
+    101: "Too close to garage",
+    103: "Too close to charging station",
+    110: "Control system error",
+    111: "Control system error",
+    112: "Control system error",
+    113: "Control system error",
+    114: "Control system error",
+    115: "Unknown error",
+    141: "Magnet sensor error",
+    147: "No camera signal",
+    151: "Control system error",
+    152: "Control system error",
+    153: "Control system error",
+    154: "Control system error",
+    155: "Control system error",
+    157: "No GPS data",
+    158: "Far from station",
+    159: "Rain sensor triggered",
+    160: "Battery temperature too hot/cold",
+    161: "Ribbon not visible",
+    163: "Control system error",
+    164: "Control system error",
+    165: "Control system error",
+    166: "Control system error",
+    167: "Control system error",
+    168: "Battery temperature too hot/cold",
+    169: "Battery error",
+    171: "No camera signal",
+    172: "Close battery hatch",
+    173: "Low voltage",
+    174: "Magnet sensor error",
+    176: "Control system error",
+    177: "Control system error",
+    178: "No battery",
+    180: "Cutter blocked",
+    181: "Cutter fault",
+    182: "Return home failed",
+    183: "Outside permitted mowing time",
+    184: "Close battery hatch",
+    185: "Battery too low to update",
+    186: "Unsupported area",
+    187: "Control system error",
+    215: "Control system error",
+}
+
 
 def status_to_label(value: Any) -> str | None:
     """Translate the status enumeration embedded in the OcuMow app."""
@@ -95,6 +160,17 @@ def status_to_label(value: Any) -> str | None:
     except (TypeError, ValueError):
         return str(value)
     return STATUS_LABELS.get(status, f"Unknown ({status})")
+
+
+def fault_to_label(value: Any) -> str | None:
+    """Translate the fault codes embedded in the OcuMow app."""
+    if value in (None, ""):
+        return None
+    try:
+        fault = int(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return FAULT_LABELS.get(fault, f"Unknown fault ({fault})")
 
 
 SENSORS: tuple[OcuMowSensorDescription, ...] = (
@@ -117,6 +193,7 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
     OcuMowSensorDescription(
         key="fault", translation_key="fault",
         property_keys=("Fault", "faultCode", "alarmCode"),
+        value_fn=fault_to_label,
         icon="mdi:alert-circle-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
