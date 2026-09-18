@@ -4,17 +4,16 @@
     "step": {
       "user": {
         "title": "Connect to OcuMow",
-        "description": "Enter the account used in the OcuMow app and the mower device ID.",
+        "description": "Enter the account used in the OcuMow app. Mowers associated with the account will be discovered automatically.",
         "data": {
           "email": "Email address",
-          "password": "Password",
-          "device_id": "Device ID",
-          "device_name": "Mower name"
-        },
-        "data_description": {
-          "device_id": "The identifier assigned to the mower by the OcuMow app/cloud.",
-          "device_name": "A temporary name used if the cloud does not return one."
+          "password": "Password"
         }
+      },
+      "device": {
+        "title": "Choose an OcuMow mower",
+        "description": "Select the mower to add.",
+        "data": {"device_id": "Mower"}
       },
       "reauth_confirm": {
         "title": "Reconnect OcuMow",
@@ -26,10 +25,12 @@
       "cannot_connect": "Unable to connect to the OcuMow service.",
       "invalid_auth": "The email address or password was rejected.",
       "invalid_device": "The account was accepted, but the mower could not be read. Check the device ID.",
+      "no_devices": "No OcuMow mowers were found on this account.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
       "already_configured": "This OcuMow mower is already configured.",
+      "discovery_expired": "Device discovery expired. Start setup again.",
       "reauth_successful": "OcuMow was reconnected successfully."
     }
   },

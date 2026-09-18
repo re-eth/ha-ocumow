@@ -10,6 +10,7 @@ from aiohttp import ClientError, ClientResponse, ClientSession
 
 from .const import (
     API_DEVICE_INFO_PATH,
+    API_DEVICE_LIST_PATH,
     API_LOGIN_PATH,
     API_USER_DOMAIN,
     API_USER_DOMAIN_SECRET,
@@ -111,6 +112,18 @@ class OcuMowApi:
             raw=payload,
         )
 
+    async def async_get_devices(self) -> list[OcuMowDevice]:
+        """Return the mowers associated with the logged-in account."""
+        if self._access_token is None:
+            await self.async_login()
+
+        response = await self._async_request(
+            "GET",
+            API_DEVICE_LIST_PATH,
+            params={"accessTypeStr": "1", "pageNum": 1, "pageSize": 100},
+        )
+        return extract_devices(response)
+
     async def _async_request(
         self,
         method: str,
@@ -173,6 +186,30 @@ def build_login_payload(email: str, password: str) -> dict[str, str]:
         "signature": signature,
         "userDomain": API_USER_DOMAIN,
     }
+
+
+def extract_devices(payload: dict[str, Any]) -> list[OcuMowDevice]:
+    """Extract account devices from the paginated response used by the app."""
+    rows = find_first_key(payload, ("rows",))
+    if not isinstance(rows, list):
+        return []
+
+    devices: list[OcuMowDevice] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        device_id = find_first_key(row, ("deviceId",))
+        if device_id is None:
+            continue
+        name = find_first_key(row, ("deviceName", "name", "productName"))
+        devices.append(
+            OcuMowDevice(
+                device_id=str(device_id),
+                name=str(name or f"OcuMow {device_id}"),
+                raw=row,
+            )
+        )
+    return devices
 
 
 def unwrap_envelope(value: Any) -> Any:

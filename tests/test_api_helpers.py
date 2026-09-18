@@ -4,6 +4,7 @@ from hashlib import sha256
 
 from custom_components.ocumow.api import (
     build_login_payload,
+    extract_devices,
     extract_properties,
     find_first_key,
     unwrap_envelope,
@@ -26,6 +27,26 @@ def test_build_login_payload_matches_apk_algorithm() -> None:
 
 def test_find_nested_token() -> None:
     assert find_first_key({"data": {"accessToken": "abc"}}, ("accessToken",)) == "abc"
+
+
+def test_extract_devices() -> None:
+    devices = extract_devices(
+        {
+            "code": 200,
+            "data": {
+                "rows": [
+                    {"deviceId": 123, "deviceName": "Back garden"},
+                    {"deviceId": "456", "productName": "OcuMow 18B"},
+                    {"deviceName": "Missing ID"},
+                ]
+            },
+        }
+    )
+
+    assert [(device.device_id, device.name) for device in devices] == [
+        ("123", "Back garden"),
+        ("456", "OcuMow 18B"),
+    ]
 
 
 def test_unwrap_envelope() -> None:

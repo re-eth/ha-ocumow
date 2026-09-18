@@ -26,10 +26,10 @@ robot mowers.
 4. Install **OcuMow**, restart Home Assistant, then go to
    **Settings → Devices & services → Add integration → OcuMow**.
 
-The setup form currently asks for the mower's device ID. This is normally
-visible in the OcuMow app's device information screen. If it is not visible,
-enable debug logging and inspect the OcuMow app traffic; automatic device
-discovery will be added when the device-list endpoint is verified.
+The setup form signs in with the account used by the OcuMow app and discovers
+its associated mowers automatically. If the account contains one mower it is
+added immediately; if it contains several, the setup flow asks which one to
+add.
 
 ```yaml
 logger:
