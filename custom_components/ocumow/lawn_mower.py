@@ -60,7 +60,7 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         if numeric_status == 4:
             return LawnMowerActivity.DOCKED
         if numeric_status in (5, 6, 7, 8):
-            return LawnMowerActivity.IDLE
+            return LawnMowerActivity.PAUSED
 
         text = " ".join(str(value).casefold() for value in (status, docked) if value is not None)
         if any(word in text for word in ("mow", "working", "cutting")):
@@ -72,8 +72,8 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         if "pause" in text:
             return LawnMowerActivity.PAUSED
         if is_active(stopped) or any(word in text for word in ("idle", "stop", "standby")):
-            return LawnMowerActivity.IDLE
-        return LawnMowerActivity.IDLE
+            return LawnMowerActivity.PAUSED
+        return LawnMowerActivity.PAUSED
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
@@ -96,6 +96,7 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         """Return the mower to its charging station."""
         await self.coordinator.api.async_send_command(COMMAND_DOCK)
         await self.coordinator.async_request_refresh()
+
 
 def is_active(value: object) -> bool:
     """Interpret common truthy fault/stopped values."""
