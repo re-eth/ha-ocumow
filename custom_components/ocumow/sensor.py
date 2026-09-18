@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import json
 from typing import Any
 import unicodedata
 
@@ -19,6 +20,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import OcuMowConfigEntry
 from .entity import OcuMowEntity
@@ -69,6 +71,117 @@ def clean_text(value: Any) -> str | None:
         for character in str(value).strip()
         if not unicodedata.category(character).startswith("C")
     )
+
+
+def decode_cloud_json(value: Any) -> Any:
+    """Decode values which the cloud sometimes returns as JSON text."""
+    current = value
+    for _ in range(2):
+        if not isinstance(current, str):
+            break
+        try:
+            current = json.loads(current)
+        except (TypeError, ValueError):
+            break
+    return current
+
+
+def nested_value(value: Any, key: str) -> Any:
+    """Find a case-insensitive key inside a structured cloud property."""
+    value = decode_cloud_json(value)
+    if isinstance(value, dict):
+        for item_key, item_value in value.items():
+            if str(item_key).casefold() == key.casefold():
+                return decode_cloud_json(item_value)
+        for item_value in value.values():
+            found = nested_value(item_value, key)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = nested_value(item, key)
+            if found is not None:
+                return found
+    return None
+
+
+def rain_delay_hours(value: Any) -> int | None:
+    """Extract the post-rain delay configured in the RainSet structure."""
+    return to_integer(nested_value(value, "DelayWorkingTime"))
+
+
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+
+def normalise_schedule(value: Any) -> list[dict[str, Any]]:
+    """Convert the mower's Schedule array into stable dictionaries."""
+    value = decode_cloud_json(value)
+    if isinstance(value, dict):
+        value = nested_value(value, "Schedule") or nested_value(value, "value")
+        value = decode_cloud_json(value)
+    if not isinstance(value, list):
+        return []
+
+    schedules: list[dict[str, Any]] = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            continue
+        lowered = {str(key).casefold(): item for key, item in raw.items()}
+        try:
+            week = int(lowered.get("week"))
+            start_hour = int(lowered.get("starthour"))
+            start_minute = int(lowered.get("startminute"))
+            end_hour = int(lowered.get("endhour"))
+            end_minute = int(lowered.get("endminute"))
+        except (TypeError, ValueError):
+            continue
+        valid_value = lowered.get("validflag", lowered.get("valid", True))
+        enabled = valid_value is True or str(valid_value).casefold() in ("1", "true")
+        # The app stores Monday-Saturday as 1-6 and Sunday as 0.
+        weekday = 6 if week == 0 else week - 1
+        if not 0 <= weekday <= 6:
+            continue
+        schedules.append(
+            {
+                "weekday": weekday,
+                "day": WEEKDAYS[weekday],
+                "start": f"{start_hour:02d}:{start_minute:02d}",
+                "end": f"{end_hour:02d}:{end_minute:02d}",
+                "enabled": enabled,
+            }
+        )
+    return sorted(schedules, key=lambda item: (item["weekday"], item["start"]))
+
+
+def schedule_summary(value: Any) -> str:
+    """Return a compact readable list of enabled mowing periods."""
+    schedules = [item for item in normalise_schedule(value) if item["enabled"]]
+    if not schedules:
+        return "No enabled schedules"
+    summary = "; ".join(
+        f"{item['day']} {item['start']}–{item['end']}" for item in schedules
+    )
+    # Home Assistant limits entity states to 255 characters. The complete
+    # unabridged schedule remains available in the entity attributes.
+    return summary if len(summary) <= 250 else f"{len(schedules)} enabled schedules"
+
+
+def next_scheduled_cut(value: Any, now: datetime | None = None) -> datetime | None:
+    """Calculate the next enabled schedule start in the HA timezone."""
+    local_now = now or dt_util.now()
+    candidates: list[datetime] = []
+    for item in normalise_schedule(value):
+        if not item["enabled"]:
+            continue
+        hours, minutes = (int(part) for part in item["start"].split(":"))
+        days_ahead = (item["weekday"] - local_now.weekday()) % 7
+        candidate = (local_now + timedelta(days=days_ahead)).replace(
+            hour=hours, minute=minutes, second=0, microsecond=0
+        )
+        if candidate <= local_now:
+            candidate += timedelta(days=7)
+        candidates.append(candidate)
+    return min(candidates).astimezone(UTC) if candidates else None
 
 
 STATUS_LABELS = {
@@ -267,6 +380,14 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    OcuMowSensorDescription(
+        key="rain_delay",
+        translation_key="rain_delay",
+        property_keys=("RainSet",),
+        value_fn=rain_delay_hours,
+        icon="mdi:weather-pouring",
+        native_unit_of_measurement=UnitOfTime.HOURS,
+    ),
 )
 
 
@@ -276,7 +397,16 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     coordinator = entry.runtime_data.coordinator
-    async_add_entities(OcuMowSensor(coordinator, description) for description in SENSORS)
+    entities: list[SensorEntity] = [
+        OcuMowSensor(coordinator, description) for description in SENSORS
+    ]
+    entities.extend(
+        (
+            OcuMowScheduleSensor(coordinator),
+            OcuMowNextCutSensor(coordinator),
+        )
+    )
+    async_add_entities(entities)
 
 
 class OcuMowSensor(OcuMowEntity, SensorEntity):
@@ -295,3 +425,39 @@ class OcuMowSensor(OcuMowEntity, SensorEntity):
         if isinstance(value, (dict, list)):
             return str(value)
         return self.entity_description.value_fn(value)
+
+
+class OcuMowScheduleSensor(OcuMowEntity, SensorEntity):
+    """Display the mower's enabled weekly schedules."""
+
+    _attr_translation_key = "schedule"
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.device.device_id}_schedule"
+
+    @property
+    def native_value(self) -> str | None:
+        value = self.device.get("Schedule")
+        return schedule_summary(value) if value is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"schedules": normalise_schedule(self.device.get("Schedule"))}
+
+
+class OcuMowNextCutSensor(OcuMowEntity, SensorEntity):
+    """Display the next enabled schedule start."""
+
+    _attr_translation_key = "next_cut"
+    _attr_icon = "mdi:calendar-arrow-right"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.device.device_id}_next_cut"
+
+    @property
+    def native_value(self) -> datetime | None:
+        return next_scheduled_cut(self.device.get("Schedule"))

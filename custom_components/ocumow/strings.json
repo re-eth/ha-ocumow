@@ -35,6 +35,9 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "rain_sensor_enabled": {"name": "Rain sensor enabled"}
+    },
     "button": {
       "reset_blade_time": {"name": "Reset blade time"}
     },
@@ -54,7 +57,10 @@
       "working_distance": {"name": "Working distance"},
       "firmware": {"name": "Firmware"},
       "last_online": {"name": "Last online"},
-      "last_offline": {"name": "Last offline"}
+      "last_offline": {"name": "Last offline"},
+      "rain_delay": {"name": "Rain delay"},
+      "schedule": {"name": "Schedules"},
+      "next_cut": {"name": "Next cut"}
     }
   }
 }

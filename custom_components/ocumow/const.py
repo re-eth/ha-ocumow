@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 DOMAIN = "ocumow"
-PLATFORMS = ["button", "lawn_mower", "sensor"]
+PLATFORMS = ["binary_sensor", "button", "lawn_mower", "sensor"]
 
 CONF_DEVICE_ID = "device_id"
 CONF_DEVICE_NAME = "device_name"
@@ -21,6 +21,8 @@ API_DEVICE_PROPERTIES_PATH = "/device/enduser/device/part/properties"
 API_SUB_DEVICE_LIST_PATH = "/device/enduser/sub/gateway/device/listPage"
 
 DEVICE_STATISTIC_PROPERTIES = (
+    "Schedule",
+    "RainSet",
     "WorkingTime",
     "RunningTime",
     "BladeTime",

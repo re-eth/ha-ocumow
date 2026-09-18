@@ -594,8 +594,8 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
         "allfirmwarever", "area", "batterystates", "batterytemp", "bladetime",
         "connectstationstates", "devicestoped", "distance", "fault", "lidstate",
         "alarmcode", "faultcode", "mainboardtemp", "mode", "onlinestatus",
-        "runningstatus", "runningtime", "signalquality", "signalstrength", "soc",
-        "status", "traveleddistance", "workingtime",
+        "rainset", "runningstatus", "runningtime", "schedule", "signalquality",
+        "signalstrength", "soc", "status", "traveleddistance", "workingtime",
     }
     return {
         str(key): value
