@@ -42,6 +42,15 @@ TOKEN_KEYS: Final = (
     "idToken",
 )
 
+AUTH_ERROR_CODES: Final = {
+    "400",
+    "401",
+    "403",
+    "1001",
+    "1002",
+    "40014",
+}
+
 
 @dataclass(slots=True)
 class OcuMowDevice:
@@ -169,7 +178,7 @@ class OcuMowApi:
         code = result.get("code", result.get("errorCode"))
         if code not in (None, 0, "0", 200, "200", "SUCCESS", "success"):
             message = result.get("message", result.get("msg", "API request failed"))
-            if str(code) in {"401", "403", "1001", "1002"}:
+            if str(code) in AUTH_ERROR_CODES:
                 raise OcuMowAuthError(str(message))
             raise OcuMowApiError(f"{message} (code {code})")
         return result
@@ -233,7 +242,7 @@ def unwrap_envelope(value: Any) -> Any:
 def unwrap_value(value: Any) -> Any:
     """Extract a scalar from a thing-model property wrapper."""
     if isinstance(value, dict):
-        for key in ("value", "val", "propertyValue", "data"):
+        for key in ("value", "val", "propertyValue", "data", "token"):
             if key in value:
                 return unwrap_value(value[key])
     return value

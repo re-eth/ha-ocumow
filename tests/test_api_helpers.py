@@ -29,6 +29,16 @@ def test_find_nested_token() -> None:
     assert find_first_key({"data": {"accessToken": "abc"}}, ("accessToken",)) == "abc"
 
 
+def test_find_wrapped_access_token() -> None:
+    assert (
+        find_first_key(
+            {"data": {"accessToken": {"expirationTime": 123, "token": "abc"}}},
+            ("accessToken", "token"),
+        )
+        == "abc"
+    )
+
+
 def test_extract_devices() -> None:
     devices = extract_devices(
         {
