@@ -8,7 +8,13 @@ from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription
-from homeassistant.const import PERCENTAGE, UnitOfArea, UnitOfTemperature
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfArea,
+    UnitOfLength,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -27,6 +33,52 @@ def milliseconds_to_datetime(value: Any) -> datetime | None:
     """Convert a millisecond Unix timestamp into a UTC datetime."""
     if value in (None, ""):
         return None
+
+
+def seconds_to_whole_hours(value: Any) -> int | None:
+    """Convert seconds to the whole-hour value displayed by the app."""
+    if value in (None, ""):
+        return None
+    try:
+        return int(float(value)) // 3600
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def to_integer(value: Any) -> int | None:
+    """Normalise an integer returned as either a number or a string."""
+    if value in (None, ""):
+        return None
+
+
+STATUS_LABELS = {
+    0: "Automatically mowing",
+    1: "Border mowing",
+    2: "Returning to charge",
+    3: "Device failure",
+    4: "Charging",
+    5: "Standby",
+    6: "Out of station",
+    7: "Hibernate",
+    8: "Manual control",
+    9: "Spot mowing",
+    10: "Borderless signalling",
+}
+
+
+def status_to_label(value: Any) -> str | None:
+    """Translate the status enumeration embedded in the OcuMow app."""
+    if value in (None, ""):
+        return None
+    try:
+        status = int(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return STATUS_LABELS.get(status, f"Unknown ({status})")
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return None
     try:
         return datetime.fromtimestamp(float(value) / 1000, tz=UTC)
     except (TypeError, ValueError, OverflowError):
@@ -41,6 +93,7 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
     OcuMowSensorDescription(
         key="status", translation_key="status",
         property_keys=("Status", "deviceStatus", "runningStatus"),
+        value_fn=status_to_label,
     ),
     OcuMowSensorDescription(
         key="signal_quality", translation_key="signal_quality",
@@ -69,16 +122,28 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(
-        key="working_time", translation_key="working_time", property_keys=("WorkingTime",),
+        key="working_time", translation_key="working_time",
+        property_keys=("BladeTime",), value_fn=seconds_to_whole_hours,
+        native_unit_of_measurement=UnitOfTime.HOURS,
     ),
     OcuMowSensorDescription(
-        key="running_time", translation_key="running_time", property_keys=("RunningTime",),
+        key="running_time", translation_key="running_time",
+        property_keys=("WorkingTime",), value_fn=seconds_to_whole_hours,
+        native_unit_of_measurement=UnitOfTime.HOURS,
     ),
     OcuMowSensorDescription(
-        key="blade_time", translation_key="blade_time", property_keys=("BladeTime",),
+        key="blade_time", translation_key="blade_time",
+        property_keys=("RunningTime",), value_fn=seconds_to_whole_hours,
+        native_unit_of_measurement=UnitOfTime.HOURS,
     ),
     OcuMowSensorDescription(
-        key="distance", translation_key="distance", property_keys=("TraveledDistance", "Distance"),
+        key="distance", translation_key="distance", property_keys=("Distance",),
+        value_fn=to_integer, native_unit_of_measurement=UnitOfLength.METERS,
+    ),
+    OcuMowSensorDescription(
+        key="working_distance", translation_key="working_distance",
+        property_keys=("TraveledDistance",), value_fn=to_integer,
+        native_unit_of_measurement=UnitOfLength.METERS,
     ),
     OcuMowSensorDescription(
         key="firmware", translation_key="firmware", property_keys=("AllFirmwareVer",),

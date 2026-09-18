@@ -44,10 +44,11 @@
       "area": {"name": "Area"},
       "mainboard_temperature": {"name": "Mainboard temperature"},
       "battery_temperature": {"name": "Battery temperature"},
-      "working_time": {"name": "Working time"},
+      "working_time": {"name": "Startup time"},
       "running_time": {"name": "Running time"},
       "blade_time": {"name": "Blade time"},
-      "distance": {"name": "Distance"},
+      "distance": {"name": "Total travelled distance"},
+      "working_distance": {"name": "Working distance"},
       "firmware": {"name": "Firmware"},
       "last_online": {"name": "Last online"},
       "last_offline": {"name": "Last offline"}

@@ -28,6 +28,8 @@ DEVICE_STATISTIC_PROPERTIES = (
     "TraveledDistance",
     "MainBoardTemp",
     "BatteryTemp",
+    "DeviceStoped",
+    "AllFirmwareVer",
 )
 
 DEVICE_LIVE_PROPERTIES = (

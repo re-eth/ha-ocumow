@@ -50,6 +50,21 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         if is_active(fault):
             return LawnMowerActivity.ERROR
 
+        try:
+            numeric_status = int(status) if status is not None else None
+        except (TypeError, ValueError):
+            numeric_status = None
+        if numeric_status in (0, 1, 9, 10):
+            return LawnMowerActivity.MOWING
+        if numeric_status == 2:
+            return LawnMowerActivity.RETURNING
+        if numeric_status == 3:
+            return LawnMowerActivity.ERROR
+        if numeric_status == 4:
+            return LawnMowerActivity.DOCKED
+        if numeric_status in (5, 6, 7, 8):
+            return LawnMowerActivity.IDLE
+
         text = " ".join(str(value).casefold() for value in (status, docked) if value is not None)
         if any(word in text for word in ("mow", "working", "cutting")):
             return LawnMowerActivity.MOWING
