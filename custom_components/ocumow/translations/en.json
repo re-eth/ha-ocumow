@@ -1,0 +1,53 @@
+{
+  "title": "OcuMow",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to OcuMow",
+        "description": "Enter the account used in the OcuMow app and the mower device ID.",
+        "data": {
+          "email": "Email address",
+          "password": "Password",
+          "device_id": "Device ID",
+          "device_name": "Mower name"
+        },
+        "data_description": {
+          "device_id": "The identifier assigned to the mower by the OcuMow app/cloud.",
+          "device_name": "A temporary name used if the cloud does not return one."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect OcuMow",
+        "description": "Enter the current password for your OcuMow account.",
+        "data": {"password": "Password"}
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the OcuMow service.",
+      "invalid_auth": "The email address or password was rejected.",
+      "invalid_device": "The account was accepted, but the mower could not be read. Check the device ID.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This OcuMow mower is already configured.",
+      "reauth_successful": "OcuMow was reconnected successfully."
+    }
+  },
+  "entity": {
+    "lawn_mower": {"mower": {"name": null}},
+    "sensor": {
+      "battery": {"name": "Battery"},
+      "status": {"name": "Status"},
+      "signal_quality": {"name": "Signal quality"},
+      "fault": {"name": "Fault"},
+      "area": {"name": "Area"},
+      "mainboard_temperature": {"name": "Mainboard temperature"},
+      "battery_temperature": {"name": "Battery temperature"},
+      "working_time": {"name": "Working time"},
+      "running_time": {"name": "Running time"},
+      "blade_time": {"name": "Blade time"},
+      "distance": {"name": "Distance"},
+      "firmware": {"name": "Firmware"}
+    }
+  }
+}
