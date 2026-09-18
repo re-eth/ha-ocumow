@@ -11,10 +11,12 @@ from aiohttp import ClientError, ClientResponse, ClientSession
 from .const import (
     API_DEVICE_INFO_PATH,
     API_DEVICE_LIST_PATH,
+    API_DEVICE_PROPERTIES_PATH,
     API_LOGIN_PATH,
     API_USER_DOMAIN,
     API_USER_DOMAIN_SECRET,
     DEFAULT_API_BASE_URL,
+    DEVICE_STATISTIC_PROPERTIES,
 )
 
 
@@ -63,7 +65,11 @@ class OcuMowDevice:
 
     def get(self, *keys: str) -> Any:
         """Return the first property matching any key, case-insensitively."""
-        lowered = {str(key).casefold(): value for key, value in self.properties.items()}
+        lowered = {
+            str(key).casefold(): value
+            for source in (self.raw, self.properties)
+            for key, value in source.items()
+        }
         for key in keys:
             if key.casefold() in lowered:
                 return unwrap_value(lowered[key.casefold()])
@@ -113,6 +119,22 @@ class OcuMowApi:
             raise OcuMowApiError("Device response did not contain an object")
 
         properties = extract_properties(payload)
+        try:
+            statistics_response = await self._async_request(
+                "GET",
+                API_DEVICE_PROPERTIES_PATH,
+                params={
+                    "deviceId": device_id,
+                    "tslPropertiesCodeStr": ",".join(DEVICE_STATISTIC_PROPERTIES),
+                },
+            )
+        except OcuMowApiError:
+            # Some gateway firmware versions do not expose this optional
+            # endpoint. Keep the basic device record usable when they do not.
+            pass
+        else:
+            statistics = extract_properties(statistics_response)
+            properties.update(statistics)
         discovered_name = find_first_key(payload, ("deviceName", "name", "productName"))
         return OcuMowDevice(
             device_id=device_id,
@@ -269,7 +291,14 @@ def find_first_key(value: Any, keys: tuple[str, ...]) -> Any:
 
 def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
     """Extract named Quectel thing-model properties from varying envelopes."""
-    for key in ("properties", "property", "thingModel", "deviceData", "statusData"):
+    for key in (
+        "properties",
+        "property",
+        "thingModel",
+        "deviceData",
+        "statusData",
+        "data",
+    ):
         candidate = find_first_key(payload, (key,))
         if isinstance(candidate, dict):
             return candidate
@@ -280,7 +309,8 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
                     continue
                 name = find_first_key(item, ("code", "key", "name", "propertyCode"))
                 item_value = find_first_key(
-                    item, ("value", "val", "propertyValue", "data")
+                    item,
+                    ("value", "val", "propertyValue", "attributeValue", "data"),
                 )
                 if name is not None:
                     converted[str(name)] = item_value
@@ -291,8 +321,9 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
     known = {
         "allfirmwarever", "area", "batterystates", "batterytemp", "bladetime",
         "connectstationstates", "devicestoped", "distance", "fault", "lidstate",
-        "mainboardtemp", "mode", "runningtime", "signalquality", "soc", "status",
-        "traveleddistance", "workingtime",
+        "alarmcode", "faultcode", "mainboardtemp", "mode", "onlinestatus",
+        "runningstatus", "runningtime", "signalquality", "signalstrength", "soc",
+        "status", "traveleddistance", "workingtime",
     }
     return {
         str(key): value

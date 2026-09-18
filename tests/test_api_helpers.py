@@ -3,6 +3,7 @@
 from hashlib import sha256
 
 from custom_components.ocumow.api import (
+    OcuMowDevice,
     build_login_payload,
     extract_devices,
     extract_properties,
@@ -71,3 +72,34 @@ def test_extract_property_list() -> None:
         ]
     }
     assert extract_properties(payload) == {"Soc": 87, "Status": "mowing"}
+
+
+def test_extract_apk_statistic_property_list() -> None:
+    payload = {
+        "code": 200,
+        "data": [
+            {"code": "RunningTime", "attributeValue": "123"},
+            {"code": "BladeTime", "attributeValue": "45"},
+            {"code": "TraveledDistance", "attributeValue": "678"},
+        ],
+    }
+
+    assert extract_properties(payload) == {
+        "RunningTime": "123",
+        "BladeTime": "45",
+        "TraveledDistance": "678",
+    }
+
+
+def test_device_get_falls_back_to_raw_gateway_fields() -> None:
+    device = OcuMowDevice(
+        device_id="5599",
+        name="Back garden",
+        properties={"soc": 100},
+        raw={"onlineStatus": 1, "runningStatus": 1, "signalStrength": "-62"},
+    )
+
+    assert device.get("Soc") == 100
+    assert device.get("onlineStatus") == 1
+    assert device.get("runningStatus") == 1
+    assert device.get("SignalQuality", "signalStrength") == "-62"

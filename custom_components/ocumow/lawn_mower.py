@@ -32,8 +32,8 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
 
     @property
     def activity(self) -> LawnMowerActivity:
-        status = self.device.get("Status", "deviceStatus", "Mode")
-        fault = self.device.get("Fault")
+        status = self.device.get("Status", "deviceStatus", "Mode", "runningStatus")
+        fault = self.device.get("Fault", "faultCode", "alarmCode")
         docked = self.device.get("ConnectStationStates", "BatteryStates")
         stopped = self.device.get("DeviceStoped")
 
@@ -56,9 +56,15 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
     @property
     def extra_state_attributes(self) -> dict[str, object]:
         return {
-            "raw_status": self.device.get("Status", "deviceStatus"),
+            "raw_status": self.device.get("Status", "deviceStatus", "runningStatus"),
             "mode": self.device.get("Mode"),
         }
+
+    @property
+    def available(self) -> bool:
+        """Report availability from the gateway record returned by the cloud."""
+        online = self.device.get("onlineStatus")
+        return super().available and online not in (0, "0", False)
 
 
 def is_active(value: object) -> bool:

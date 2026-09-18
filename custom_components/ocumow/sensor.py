@@ -28,14 +28,17 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
         device_class=SensorDeviceClass.BATTERY, native_unit_of_measurement=PERCENTAGE,
     ),
     OcuMowSensorDescription(
-        key="status", translation_key="status", property_keys=("Status", "deviceStatus"),
+        key="status", translation_key="status",
+        property_keys=("Status", "deviceStatus", "runningStatus"),
     ),
     OcuMowSensorDescription(
-        key="signal_quality", translation_key="signal_quality", property_keys=("SignalQuality",),
+        key="signal_quality", translation_key="signal_quality",
+        property_keys=("SignalQuality", "signalStrength"),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(
-        key="fault", translation_key="fault", property_keys=("Fault",),
+        key="fault", translation_key="fault",
+        property_keys=("Fault", "faultCode", "alarmCode"),
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(

@@ -16,6 +16,17 @@ API_LOGIN_PATH = "/enduser/app/user/emailPwdLogin"
 API_REFRESH_PATH = "/enduser/app/user/refreshToken"
 API_DEVICE_LIST_PATH = "/device/enduser/device/listPage"
 API_DEVICE_INFO_PATH = "/device/enduser/deviceInfo"
+API_DEVICE_PROPERTIES_PATH = "/device/enduser/device/part/properties"
+
+DEVICE_STATISTIC_PROPERTIES = (
+    "WorkingTime",
+    "RunningTime",
+    "BladeTime",
+    "Distance",
+    "TraveledDistance",
+    "MainBoardTemp",
+    "BatteryTemp",
+)
 
 # Values applied by OcuMow Android 1.3.15 after selecting Europe and used to
 # sign email logins. The app currently applies this same pair to both entries
@@ -31,6 +42,10 @@ SENSITIVE_KEYS = {
     "accesstoken",
     "access_token",
     "authorization",
+    "authCode",
+    "authKey",
+    "deviceKey",
+    "email",
     "password",
     "pincode",
     "pin",
