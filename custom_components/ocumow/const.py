@@ -17,9 +17,11 @@ API_REFRESH_PATH = "/enduser/app/user/refreshToken"
 API_DEVICE_LIST_PATH = "/device/enduser/device/listPage"
 API_DEVICE_INFO_PATH = "/device/enduser/deviceInfo"
 
-# Values embedded in OcuMow Android 1.3.15 and used to sign email logins.
-API_USER_DOMAIN = "C.DM.8294.1"
-API_USER_DOMAIN_SECRET = "9Y6Ec9hFTmTrAiSAQoLy6RwnLZnoKimMjcxYBjibkVKg"
+# Values applied by OcuMow Android 1.3.15 after selecting Europe and used to
+# sign email logins. The app currently applies this same pair to both entries
+# in its region selector.
+API_USER_DOMAIN = "E.DM.4294968778.2"
+API_USER_DOMAIN_SECRET = "4VEMeZKzqMdvbea6DVgytQtvSLZyB9QkGPva3qSWv8vr"
 
 SENSITIVE_KEYS = {
     "Access-Token",
