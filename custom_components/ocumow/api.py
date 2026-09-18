@@ -106,6 +106,8 @@ class OcuMowApi:
         self._access_token: str | None = None
         self._command_device_key: str | None = None
         self._command_product_key: str | None = None
+        self.last_command_result: str | None = None
+        self.last_command_message_id: int | None = None
 
     async def async_login(self) -> None:
         """Authenticate using the endpoint and field names found in the APK."""
@@ -276,6 +278,8 @@ class OcuMowApi:
                 "kv": json.dumps([attribute], separators=(",", ":")),
             },
         }
+        self.last_command_message_id = message_id
+        self.last_command_result = "Sending"
 
         try:
             async with self._session.ws_connect(self._websocket_url) as websocket:
@@ -290,11 +294,63 @@ class OcuMowApi:
                 await websocket.send_str(json.dumps(request, separators=(",", ":")))
                 # Allow the cloud to acknowledge or reject the write before
                 # closing the short-lived Home Assistant connection.
-                await self._async_wait_for_websocket(
-                    websocket, timeout=5, response_required=True
+                await self._async_wait_for_command_ack(
+                    websocket, message_id=message_id, timeout=8
                 )
         except (ClientError, TimeoutError) as err:
+            self.last_command_result = f"Connection error: {err}"
             raise OcuMowConnectionError(str(err)) from err
+
+    async def _async_wait_for_command_ack(
+        self, websocket, *, message_id: int, timeout: float
+    ) -> None:
+        """Wait for the send_ack belonging to the command, ignoring broadcasts."""
+        deadline = asyncio.get_running_loop().time() + timeout
+        while (remaining := deadline - asyncio.get_running_loop().time()) > 0:
+            try:
+                message = await websocket.receive(timeout=remaining)
+            except asyncio.TimeoutError:
+                break
+
+            if message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
+                detail = websocket.exception() or "WebSocket closed unexpectedly"
+                self.last_command_result = f"Connection closed: {detail}"
+                raise OcuMowConnectionError(str(detail))
+            if message.type != WSMsgType.TEXT:
+                continue
+            try:
+                response = json.loads(message.data)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(response, dict) or response.get("cmd") != "send_ack":
+                continue
+
+            acknowledged_id = find_first_key(response, ("msgId",))
+            if acknowledged_id is not None and str(acknowledged_id) != str(message_id):
+                continue
+
+            code = response.get("code", response.get("errorCode"))
+            message_text = response.get("message", response.get("msg"))
+            self.last_command_result = str(
+                message_text or ("Acknowledged" if code in (None, 0, "0", 200, "200") else code)
+            )
+            _LOGGER.info(
+                "OcuMow command acknowledgement: msgId=%s code=%s message=%s",
+                message_id,
+                code,
+                message_text,
+            )
+            if code not in (None, 0, "0", 200, "200", "SUCCESS", "success"):
+                raise OcuMowApiError(
+                    f"Mower rejected the command: {message_text or 'unknown error'} "
+                    f"(code {code})"
+                )
+            return
+
+        self.last_command_result = "No command acknowledgement received"
+        raise OcuMowApiError(
+            "The OcuMow cloud did not acknowledge the mower command"
+        )
 
     async def _async_wait_for_websocket(
         self,

@@ -80,21 +80,32 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         return {
             "raw_status": self.device.get("Status", "deviceStatus", "runningStatus"),
             "mode": self.device.get("Mode"),
+            "last_command_message_id": self.coordinator.api.last_command_message_id,
+            "last_command_result": self.coordinator.api.last_command_result,
         }
 
     async def async_start_mowing(self) -> None:
         """Start or resume mowing."""
-        await self.coordinator.api.async_send_command(COMMAND_START)
+        try:
+            await self.coordinator.api.async_send_command(COMMAND_START)
+        finally:
+            self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     async def async_pause(self) -> None:
         """Pause mowing."""
-        await self.coordinator.api.async_send_command(COMMAND_PAUSE)
+        try:
+            await self.coordinator.api.async_send_command(COMMAND_PAUSE)
+        finally:
+            self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     async def async_dock(self) -> None:
         """Return the mower to its charging station."""
-        await self.coordinator.api.async_send_command(COMMAND_DOCK)
+        try:
+            await self.coordinator.api.async_send_command(COMMAND_DOCK)
+        finally:
+            self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
 
