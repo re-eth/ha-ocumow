@@ -106,19 +106,23 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
         key="status", translation_key="status",
         property_keys=("Status", "deviceStatus", "runningStatus"),
         value_fn=status_to_label,
+        icon="mdi:robot-mower-outline",
     ),
     OcuMowSensorDescription(
         key="signal_quality", translation_key="signal_quality",
         property_keys=("SignalQuality", "signalStrength"),
+        icon="mdi:wifi",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(
         key="fault", translation_key="fault",
         property_keys=("Fault", "faultCode", "alarmCode"),
+        icon="mdi:alert-circle-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(
         key="area", translation_key="area", property_keys=("Area",),
+        icon="mdi:ruler-square",
         native_unit_of_measurement=UnitOfArea.SQUARE_METERS,
     ),
     OcuMowSensorDescription(
@@ -136,30 +140,36 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
     OcuMowSensorDescription(
         key="working_time", translation_key="working_time",
         property_keys=("BladeTime",), value_fn=seconds_to_whole_hours,
+        icon="mdi:power",
         native_unit_of_measurement=UnitOfTime.HOURS,
     ),
     OcuMowSensorDescription(
         key="running_time", translation_key="running_time",
         property_keys=("WorkingTime",), value_fn=seconds_to_whole_hours,
+        icon="mdi:timer-outline",
         native_unit_of_measurement=UnitOfTime.HOURS,
     ),
     OcuMowSensorDescription(
         key="blade_time", translation_key="blade_time",
         property_keys=("RunningTime",), value_fn=seconds_to_whole_hours,
+        icon="mdi:saw-blade",
         native_unit_of_measurement=UnitOfTime.HOURS,
     ),
     OcuMowSensorDescription(
         key="distance", translation_key="distance", property_keys=("Distance",),
-        value_fn=to_integer, native_unit_of_measurement=UnitOfLength.METERS,
+        value_fn=to_integer, icon="mdi:map-marker-distance",
+        native_unit_of_measurement=UnitOfLength.METERS,
     ),
     OcuMowSensorDescription(
         key="working_distance", translation_key="working_distance",
         property_keys=("TraveledDistance",), value_fn=to_integer,
+        icon="mdi:map-marker-path",
         native_unit_of_measurement=UnitOfLength.METERS,
     ),
     OcuMowSensorDescription(
         key="firmware", translation_key="firmware", property_keys=("AllFirmwareVer",),
         value_fn=clean_text,
+        icon="mdi:chip",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     OcuMowSensorDescription(
@@ -167,6 +177,7 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
         translation_key="last_online",
         property_keys=("tsLastOnlineTime",),
         value_fn=milliseconds_to_datetime,
+        icon="mdi:cloud-check-outline",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -175,6 +186,7 @@ SENSORS: tuple[OcuMowSensorDescription, ...] = (
         translation_key="last_offline",
         property_keys=("tsLastOfflineTime",),
         value_fn=milliseconds_to_datetime,
+        icon="mdi:cloud-off-outline",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from hashlib import sha256
@@ -22,6 +23,7 @@ from .const import (
     DEFAULT_WEBSOCKET_URL,
     DEVICE_LIVE_PROPERTIES,
     DEVICE_STATISTIC_PROPERTIES,
+    RESET_DATA_MESSAGE_ID,
 )
 
 
@@ -202,6 +204,35 @@ class OcuMowApi:
         message_id = COMMAND_MESSAGE_IDS.get(command)
         if message_id is None:
             raise OcuMowApiError(f"Unsupported mower command: {command}")
+
+        await self._async_send_attribute(
+            message_id=message_id,
+            attribute_id=30,
+            name="Command",
+            attribute_type="ENUM",
+            value=command,
+        )
+
+    async def async_reset_blade_time(self) -> None:
+        """Send the ClearData command used by the app's blade-time reset."""
+        await self._async_send_attribute(
+            message_id=RESET_DATA_MESSAGE_ID,
+            attribute_id=28,
+            name="ClearData",
+            attribute_type="BOOL",
+            value="true",
+        )
+
+    async def _async_send_attribute(
+        self,
+        *,
+        message_id: int,
+        attribute_id: int,
+        name: str,
+        attribute_type: str,
+        value: str,
+    ) -> None:
+        """Send one thing-model attribute using the app's WebSocket format."""
         if self._command_device_key is None or self._command_product_key is None:
             raise OcuMowApiError("Mower command details have not been discovered")
 
@@ -212,15 +243,25 @@ class OcuMowApi:
         subscription = {
             "cmd": "subscribe",
             "data": [
-                target,
-                {"messageType": ["ONLINE", "STATUS", "RAW-UPLINK"]},
+                {
+                    **target,
+                    "messageType": [
+                        "ONLINE",
+                        "STATUS",
+                        "MATTR-REPORT",
+                        "MEVENT-INFO",
+                        "MEVENT-WARN",
+                        "MEVENT-ERROR",
+                        "LOCATION-INFO-KV",
+                    ],
+                }
             ],
         }
         attribute = {
-            "id": 30,
-            "name": "Command",
-            "type": "ENUM",
-            "value": command,
+            "id": attribute_id,
+            "name": name,
+            "type": attribute_type,
+            "value": value,
         }
         request = {
             "cmd": "send",
@@ -236,7 +277,12 @@ class OcuMowApi:
         try:
             async with self._session.ws_connect(self._websocket_url) as websocket:
                 await websocket.send_json(subscription)
+                # The Android app keeps one socket open and subscribes before
+                # commands are sent. Give the cloud time to register a fresh
+                # short-lived subscription before sending the command.
+                await asyncio.sleep(0.25)
                 await websocket.send_json(request)
+                await asyncio.sleep(0.5)
         except (ClientError, TimeoutError) as err:
             raise OcuMowConnectionError(str(err)) from err
 

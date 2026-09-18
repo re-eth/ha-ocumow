@@ -35,6 +35,9 @@
     }
   },
   "entity": {
+    "button": {
+      "reset_blade_time": {"name": "Reset blade time"}
+    },
     "lawn_mower": {"mower": {"name": null}},
     "sensor": {
       "battery": {"name": "Battery"},

@@ -17,6 +17,7 @@ from custom_components.ocumow.const import (
     COMMAND_MESSAGE_IDS,
     COMMAND_PAUSE,
     COMMAND_START,
+    RESET_DATA_MESSAGE_ID,
 )
 
 
@@ -39,6 +40,7 @@ def test_command_message_ids_match_apk() -> None:
         COMMAND_START: 1013,
         COMMAND_DOCK: 1014,
     }
+    assert RESET_DATA_MESSAGE_ID == 1001
 
 
 def test_find_nested_token() -> None:
