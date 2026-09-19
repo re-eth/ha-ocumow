@@ -66,7 +66,8 @@ def mowing_area_label(value: Any) -> str | None:
     area = to_integer(value)
     if area is None:
         return None
-    return {0: "Main", 1: "Other"}.get(area, f"Unknown ({area})")
+    # The mower protocol uses 1 for the main boundary and 0 for the other area.
+    return {0: "Other", 1: "Main"}.get(area, f"Unknown ({area})")
 
 
 def clean_text(value: Any) -> str | None:
