@@ -433,26 +433,38 @@ class OcuMowApi:
         authenticated: bool = True,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        headers = {
-            "Accept": "application/json",
-            "Accept-Language": "en-US",
-            "Content-Type": "application/json; charset=UTF-8",
-        }
-        if authenticated and self._access_token:
-            # OcuMow 1.3.15 sends the access token verbatim in this header.
-            headers["token"] = self._access_token
-        try:
-            async with self._session.request(
-                method,
-                f"{self._base_url}{path}",
-                headers=headers,
-                **kwargs,
-            ) as response:
-                return await self._decode_response(response)
-        except OcuMowError:
-            raise
-        except (ClientError, TimeoutError) as err:
-            raise OcuMowConnectionError(str(err)) from err
+        for attempt in range(2):
+            headers = {
+                "Accept": "application/json",
+                "Accept-Language": "en-US",
+                "Content-Type": "application/json; charset=UTF-8",
+            }
+            if authenticated and self._access_token:
+                # OcuMow 1.3.15 sends the access token verbatim in this header.
+                headers["token"] = self._access_token
+            try:
+                async with self._session.request(
+                    method,
+                    f"{self._base_url}{path}",
+                    headers=headers,
+                    **kwargs,
+                ) as response:
+                    return await self._decode_response(response)
+            except OcuMowAuthError:
+                # Access tokens expire after the integration has been running
+                # for a while. Sign in again with the stored credentials and
+                # retry the original request once before asking Home Assistant
+                # to start a reauthentication flow.
+                if not authenticated or attempt:
+                    raise
+                self._access_token = None
+                await self.async_login()
+            except OcuMowError:
+                raise
+            except (ClientError, TimeoutError) as err:
+                raise OcuMowConnectionError(str(err)) from err
+
+        raise OcuMowAuthError("Unable to renew the expired OcuMow token")
 
     async def _decode_response(self, response: ClientResponse) -> dict[str, Any]:
         if response.status in (401, 403):

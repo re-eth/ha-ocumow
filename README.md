@@ -28,7 +28,8 @@ robot mowers.
 - Online connectivity and stopped-state binary sensors
 - A button to reset the blade-time counter
 - Diagnostics downloads with credentials, device secrets and tokens redacted
-- Reauthentication when cloud credentials expire
+- Reauthentication when the stored account credentials are rejected
+- Automatic renewal of expired cloud access tokens
 - No external Python package dependency
 
 Entities are shown as unavailable when the mower or cloud does not supply the
