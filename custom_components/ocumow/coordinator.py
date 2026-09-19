@@ -43,7 +43,7 @@ class OcuMowCoordinator(DataUpdateCoordinator[OcuMowDevice]):
     def async_start_websocket(self) -> None:
         """Start the persistent live-event connection."""
         if self._websocket_task is None and self.api.websocket_ready:
-            self._websocket_task = self.hass.async_create_task(
+            self._websocket_task = self.hass.async_create_background_task(
                 self._async_websocket_loop(), "OcuMow live cloud events"
             )
 
