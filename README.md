@@ -16,7 +16,7 @@ robot mowers.
 - Automatic discovery of mowers associated with the account
 - One `lawn_mower` entity per configured mower, with start/resume, pause and
   return-to-dock controls
-- One-minute cloud polling
+- Persistent cloud WebSocket updates with one-minute polling as a fallback
 - Immediate command feedback with short-lived faster polling while the cloud
   catches up
 - Battery level and translated mower status
@@ -24,7 +24,7 @@ robot mowers.
 - Blade time, running time and startup/powered-on time
 - Total travelled distance and working distance
 - Mainboard and battery temperatures
-- Signal quality, firmware, fault description, and last online/offline times
+- Signal quality, firmware, fault description, and cloud connection history
 - Weekly schedule summary and calculated next cut
 - Rain-sensor enabled state and configured post-rain delay
 - Online connectivity and stopped-state binary sensors
@@ -80,16 +80,16 @@ The exact entities available depend on the information returned by the mower.
 | Fault | Human-readable fault description, while retaining unknown numeric codes |
 | Reset blade time | Sends the same blade-counter reset command used by the app |
 
-Temperature, signal-quality, firmware, and last-online/offline diagnostic
-entities are also provided when their values are available.
+Temperature, signal-quality, firmware, cloud-connected-since, and last-cloud-
+disconnection diagnostic entities are also provided when available.
 
 ## Command behaviour
 
-Controls use the cloud WebSocket commands observed in OcuMow app version
-1.3.15. A command can be accepted by the cloud but refused by the mower, for
-example when mowing is not allowed at night or another operating restriction
-is active. Home Assistant preserves the mower's fault state so the reason can
-be inspected.
+Live mower changes and controls use the cloud WebSocket protocol observed in
+OcuMow app version 1.3.15. A command can be accepted by the cloud but refused
+by the mower, for example when mowing is not allowed at night or another
+operating restriction is active. Home Assistant preserves the mower's fault
+state so the reason can be inspected.
 
 The blade-time reset is also cloud controlled. The statistics endpoint can
 lag behind a successful reset acknowledgement, so its displayed value may
@@ -117,7 +117,7 @@ diagnostics file before sharing it publicly.
 
 ## Known limitations
 
-- This is a cloud-polling integration, not a local-LAN or Bluetooth
+- This is a cloud integration, not a local-LAN or Bluetooth
   integration. Internet and vendor-cloud availability are required.
 - CLEVA does not publish or support this API, so it may change without notice.
 - Compatibility and command behaviour may vary between mower models and

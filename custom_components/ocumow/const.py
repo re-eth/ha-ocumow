@@ -41,6 +41,8 @@ DEVICE_LIVE_PROPERTIES = (
     "Area",
     "SignalQuality",
     "Fault",
+    "ConnectStationStates",
+    "BatteryStates",
 )
 
 COMMAND_PAUSE = "0"

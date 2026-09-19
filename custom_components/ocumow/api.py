@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Final
@@ -108,6 +109,114 @@ class OcuMowApi:
         self._command_product_key: str | None = None
         self.last_command_result: str | None = None
         self.last_command_message_id: int | None = None
+
+    @property
+    def websocket_ready(self) -> bool:
+        """Return whether the mower keys needed for a subscription are known."""
+        return bool(self._command_device_key and self._command_product_key)
+
+    async def async_listen_events(
+        self, callback: Callable[[dict[str, Any]], Awaitable[None]]
+    ) -> None:
+        """Listen for mower cloud events until disconnected or cancelled."""
+        if self._access_token is None:
+            await self.async_login()
+        if not self.websocket_ready:
+            raise OcuMowApiError("Mower WebSocket details have not been discovered")
+
+        target = {
+            "productKey": self._command_product_key,
+            "deviceKey": self._command_device_key,
+        }
+        subscription = {
+            "cmd": "subscribe",
+            "data": [
+                {
+                    **target,
+                    "messageType": [
+                        "ONLINE",
+                        "STATUS",
+                        "MATTR-REPORT",
+                        "MEVENT-INFO",
+                        "MEVENT-WARN",
+                        "MEVENT-ERROR",
+                        "LOCATION-INFO-KV",
+                    ],
+                }
+            ],
+        }
+
+        try:
+            async with self._session.ws_connect(self._websocket_url) as websocket:
+                await websocket.send_str(
+                    json.dumps(
+                        {"cmd": "login", "data": {"token": self._access_token}},
+                        separators=(",", ":"),
+                    )
+                )
+                login_response = await self._async_wait_for_named_response(
+                    websocket, expected_cmd="login_resp", timeout=10
+                )
+                login_data = login_response.get("data")
+                if (
+                    not isinstance(login_data, dict)
+                    or login_data.get("code") not in (1, "1")
+                ):
+                    self._access_token = None
+                    detail = (
+                        login_data.get("msg") if isinstance(login_data, dict) else None
+                    )
+                    raise OcuMowAuthError(
+                        f"WebSocket login failed: {detail or 'unknown error'}"
+                    )
+
+                await websocket.send_str(
+                    json.dumps(subscription, separators=(",", ":"))
+                )
+                subscribe_response = await self._async_wait_for_named_response(
+                    websocket, expected_cmd="subscribe_resp", timeout=10
+                )
+                subscribe_data = subscribe_response.get("data")
+                result = (
+                    subscribe_data[0]
+                    if isinstance(subscribe_data, list) and subscribe_data
+                    else None
+                )
+                if not isinstance(result, dict) or result.get("code") not in (1, "1"):
+                    detail = result.get("msg") if isinstance(result, dict) else None
+                    raise OcuMowApiError(
+                        f"WebSocket subscription failed: {detail or 'unknown error'}"
+                    )
+
+                _LOGGER.debug("OcuMow live WebSocket subscription connected")
+                while True:
+                    try:
+                        message = await websocket.receive(timeout=30)
+                    except asyncio.TimeoutError:
+                        await websocket.send_str('{"cmd":"pong"}')
+                        continue
+
+                    if message.type == WSMsgType.TEXT:
+                        try:
+                            event = json.loads(message.data)
+                        except (TypeError, ValueError):
+                            continue
+                        if not isinstance(event, dict):
+                            continue
+                        if event.get("cmd") == "ping":
+                            await websocket.send_str('{"cmd":"pong"}')
+                            continue
+                        await callback(event)
+                        continue
+                    if message.type in (
+                        WSMsgType.CLOSE,
+                        WSMsgType.CLOSED,
+                        WSMsgType.ERROR,
+                    ):
+                        detail = websocket.exception() or "WebSocket closed"
+                        raise OcuMowConnectionError(str(detail))
+        except (ClientError, TimeoutError) as err:
+            raise OcuMowConnectionError(str(err)) from err
 
     async def async_login(self) -> None:
         """Authenticate using the endpoint and field names found in the APK."""
@@ -630,3 +739,73 @@ def extract_properties(payload: dict[str, Any]) -> dict[str, Any]:
         for key, value in payload.items()
         if str(key).casefold() in known
     }
+
+
+def extract_live_properties(event: dict[str, Any]) -> dict[str, Any]:
+    """Extract changed thing-model values from a WebSocket broadcast."""
+    changed: dict[str, Any] = {}
+    direct_property_names = {
+        name.casefold(): name
+        for name in (*DEVICE_LIVE_PROPERTIES, *DEVICE_STATISTIC_PROPERTIES)
+    }
+
+    def visit(value: Any) -> None:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith(("{", "[")):
+                try:
+                    visit(json.loads(stripped))
+                except ValueError:
+                    pass
+            return
+        if isinstance(value, list):
+            for item in value:
+                visit(item)
+            return
+        if not isinstance(value, dict):
+            return
+
+        name = next(
+            (
+                value[key]
+                for key in ("code", "key", "name", "propertyCode")
+                if key in value
+            ),
+            None,
+        )
+        item_value = next(
+            (
+                value[key]
+                for key in ("value", "val", "propertyValue", "attributeValue")
+                if key in value
+            ),
+            None,
+        )
+        if name is not None and item_value is not None:
+            changed[str(name)] = unwrap_value(item_value)
+
+        event_type = str(value.get("type", "")).upper()
+        if event_type == "ONLINE" and "value" in value:
+            changed["onlineStatus"] = unwrap_value(value["value"])
+        for source, destination in (
+            ("battery", "Soc"),
+            ("signal_strength", "SignalQuality"),
+        ):
+            if source in value:
+                changed[destination] = unwrap_value(value[source])
+
+        for key, item in value.items():
+            lowered_key = str(key).casefold()
+            if lowered_key in direct_property_names:
+                changed[direct_property_names[lowered_key]] = unwrap_value(item)
+            if lowered_key in {
+                "kv",
+                "data",
+                "properties",
+                "property",
+                "tslproperties",
+            }:
+                visit(item)
+
+    visit(event)
+    return changed

@@ -58,8 +58,8 @@
       "distance": {"name": "Total travelled distance"},
       "working_distance": {"name": "Working distance"},
       "firmware": {"name": "Firmware"},
-      "last_online": {"name": "Last online"},
-      "last_offline": {"name": "Last offline"},
+      "last_online": {"name": "Cloud connected since"},
+      "last_offline": {"name": "Last cloud disconnection"},
       "rain_delay": {"name": "Rain delay"},
       "schedule": {"name": "Schedules"},
       "next_cut": {"name": "Next cut"}

@@ -6,6 +6,7 @@ from custom_components.ocumow.api import (
     OcuMowDevice,
     build_login_payload,
     extract_devices,
+    extract_live_properties,
     extract_properties,
     find_first_key,
     unwrap_envelope,
@@ -118,6 +119,42 @@ def test_extract_sub_device_tsl_properties() -> None:
     }
 
     assert extract_properties(payload) == {"Soc": "84", "Status": "1"}
+
+
+def test_extract_live_websocket_properties() -> None:
+    event = {
+        "cmd": "message",
+        "data": {
+            "type": "MATTR",
+            "subtype": "REPORT",
+            "kv": '[{"code":"Status","value":"2"},'
+            '{"name":"Soc","attributeValue":98}]',
+        },
+    }
+
+    assert extract_live_properties(event) == {"Status": "2", "Soc": 98}
+
+
+def test_extract_live_online_status() -> None:
+    event = {"cmd": "message", "data": {"type": "ONLINE", "value": "1"}}
+
+    assert extract_live_properties(event) == {"onlineStatus": "1"}
+
+
+def test_extract_live_station_connection() -> None:
+    event = {
+        "cmd": "message",
+        "data": {
+            "type": "MATTR",
+            "subtype": "REPORT",
+            "kv": {"Status": 5, "ConnectStationStates": True},
+        },
+    }
+
+    assert extract_live_properties(event) == {
+        "Status": 5,
+        "ConnectStationStates": True,
+    }
 
 
 def test_extract_structured_property_specs() -> None:

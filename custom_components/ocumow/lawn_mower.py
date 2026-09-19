@@ -67,7 +67,8 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         """Translate the latest activity reported by the cloud."""
         status = self.device.get("Status", "deviceStatus", "Mode", "runningStatus")
         fault = self.device.get("Fault", "faultCode", "alarmCode")
-        docked = self.device.get("ConnectStationStates", "BatteryStates")
+        station_connected = self.device.get("ConnectStationStates")
+        battery_state = self.device.get("BatteryStates")
         stopped = self.device.get("DeviceStoped")
 
         # Error 183 means the mower is outside its permitted mowing time. The
@@ -76,12 +77,22 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         # the reason.
         try:
             if int(fault) == 183:
-                return LawnMowerActivity.PAUSED
+                return (
+                    LawnMowerActivity.DOCKED
+                    if is_cloud_true(station_connected)
+                    else LawnMowerActivity.PAUSED
+                )
         except (TypeError, ValueError):
             pass
 
         if is_active(fault):
             return LawnMowerActivity.ERROR
+
+        # Status 5 means standby regardless of location. The app exposes a
+        # separate station-contact boolean, which distinguishes a mower safely
+        # docked at its charger from one paused elsewhere on the lawn.
+        if is_cloud_true(station_connected):
+            return LawnMowerActivity.DOCKED
 
         try:
             numeric_status = int(status) if status is not None else None
@@ -98,7 +109,11 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
         if numeric_status in (5, 6, 7, 8):
             return LawnMowerActivity.PAUSED
 
-        text = " ".join(str(value).casefold() for value in (status, docked) if value is not None)
+        text = " ".join(
+            str(value).casefold()
+            for value in (status, station_connected, battery_state)
+            if value is not None
+        )
         if any(word in text for word in ("mow", "working", "cutting")):
             return LawnMowerActivity.MOWING
         if any(word in text for word in ("return", "homing", "recharging")):
@@ -115,6 +130,8 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
     def extra_state_attributes(self) -> dict[str, object]:
         return {
             "raw_status": self.device.get("Status", "deviceStatus", "runningStatus"),
+            "station_connected": self.device.get("ConnectStationStates"),
+            "battery_state": self.device.get("BatteryStates"),
             "mode": self.device.get("Mode"),
             "last_command_message_id": self.coordinator.api.last_command_message_id,
             "last_command_result": self.coordinator.api.last_command_result,
@@ -187,3 +204,8 @@ def is_active(value: object) -> bool:
     if isinstance(value, str):
         return value.strip().casefold() not in ("", "0", "false", "none", "normal", "ok")
     return True
+
+
+def is_cloud_true(value: object) -> bool:
+    """Interpret the explicit cloud true/one representation."""
+    return value is True or str(value).strip().casefold() in ("1", "true", "on")

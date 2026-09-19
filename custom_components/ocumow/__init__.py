@@ -42,9 +42,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: OcuMowConfigEntry) -> bo
 
     entry.runtime_data = OcuMowRuntimeData(coordinator)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    coordinator.async_start_websocket()
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: OcuMowConfigEntry) -> bool:
     """Unload an OcuMow config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        await entry.runtime_data.coordinator.async_stop_websocket()
+    return unloaded
