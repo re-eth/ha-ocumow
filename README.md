@@ -17,6 +17,8 @@ robot mowers.
 - One `lawn_mower` entity per configured mower, with start/resume, pause and
   return-to-dock controls
 - One-minute cloud polling
+- Immediate command feedback with short-lived faster polling while the cloud
+  catches up
 - Battery level and translated mower status
 - Mowing area shown as **Main** or **Other**, matching the app
 - Blade time, running time and startup/powered-on time

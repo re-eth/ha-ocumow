@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+from time import monotonic
+
 from homeassistant.components.lawn_mower import (
     LawnMowerActivity,
     LawnMowerEntity,
@@ -36,9 +39,32 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"{self.device.device_id}_mower"
+        self._optimistic_activity: LawnMowerActivity | None = None
+        self._optimistic_until = 0.0
+        self._command_refresh_task: asyncio.Task[None] | None = None
+        self.async_on_remove(self._cancel_command_refresh)
 
     @property
     def activity(self) -> LawnMowerActivity:
+        reported_activity = self._reported_activity()
+        if self._optimistic_activity is not None:
+            fault = self.device.get("Fault", "faultCode", "alarmCode")
+            if (
+                reported_activity == self._optimistic_activity
+                or (
+                    self._optimistic_activity == LawnMowerActivity.RETURNING
+                    and reported_activity == LawnMowerActivity.DOCKED
+                )
+                or is_active(fault)
+                or monotonic() >= self._optimistic_until
+            ):
+                self._optimistic_activity = None
+            else:
+                return self._optimistic_activity
+        return reported_activity
+
+    def _reported_activity(self) -> LawnMowerActivity:
+        """Translate the latest activity reported by the cloud."""
         status = self.device.get("Status", "deviceStatus", "Mode", "runningStatus")
         fault = self.device.get("Fault", "faultCode", "alarmCode")
         docked = self.device.get("ConnectStationStates", "BatteryStates")
@@ -96,27 +122,62 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
 
     async def async_start_mowing(self) -> None:
         """Start or resume mowing."""
-        try:
-            await self.coordinator.api.async_send_command(COMMAND_START)
-        finally:
-            self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.api.async_send_command(COMMAND_START)
+        self._begin_command_refresh(LawnMowerActivity.MOWING)
 
     async def async_pause(self) -> None:
         """Pause mowing."""
-        try:
-            await self.coordinator.api.async_send_command(COMMAND_PAUSE)
-        finally:
-            self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
+        await self.coordinator.api.async_send_command(COMMAND_PAUSE)
+        self._begin_command_refresh(LawnMowerActivity.PAUSED)
 
     async def async_dock(self) -> None:
         """Return the mower to its charging station."""
+        await self.coordinator.api.async_send_command(COMMAND_DOCK)
+        self._begin_command_refresh(LawnMowerActivity.RETURNING)
+
+    def _begin_command_refresh(self, activity: LawnMowerActivity) -> None:
+        """Show the acknowledged command and temporarily poll more quickly."""
+        self._cancel_command_refresh()
+        self._optimistic_activity = activity
+        self._optimistic_until = monotonic() + 120
+        self.async_write_ha_state()
+        self._command_refresh_task = self.hass.async_create_task(
+            self._async_command_refresh(activity),
+            f"Refresh OcuMow after {activity}",
+        )
+
+    def _cancel_command_refresh(self) -> None:
+        """Cancel an earlier command's follow-up polling."""
+        if self._command_refresh_task is not None:
+            self._command_refresh_task.cancel()
+            self._command_refresh_task = None
+
+    async def _async_command_refresh(self, expected: LawnMowerActivity) -> None:
+        """Refresh promptly while the cloud catches up with a command."""
         try:
-            await self.coordinator.api.async_send_command(COMMAND_DOCK)
+            # These are delays between requests, giving refreshes at roughly
+            # 0, 5, 15, 30, 60 and 120 seconds after the command.
+            for delay in (0, 5, 10, 15, 30, 60):
+                if delay:
+                    await asyncio.sleep(delay)
+                await self.coordinator.async_request_refresh()
+                reported = self._reported_activity()
+                fault = self.device.get("Fault", "faultCode", "alarmCode")
+                if (
+                    reported == expected
+                    or (
+                        expected == LawnMowerActivity.RETURNING
+                        and reported == LawnMowerActivity.DOCKED
+                    )
+                    or is_active(fault)
+                ):
+                    break
         finally:
-            self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
+            if asyncio.current_task() is self._command_refresh_task:
+                self._optimistic_activity = None
+                self._optimistic_until = 0.0
+                self._command_refresh_task = None
+                self.async_write_ha_state()
 
 
 def is_active(value: object) -> bool:
