@@ -26,6 +26,7 @@ from .const import (
     DEVICE_LIVE_PROPERTIES,
     DEVICE_STATISTIC_PROPERTIES,
     RESET_DATA_MESSAGE_ID,
+    SCHEDULE_MODE_MESSAGE_ID,
 )
 
 
@@ -335,6 +336,16 @@ class OcuMowApi:
             name="ClearData",
             attribute_type="BOOL",
             value="true",
+        )
+
+    async def async_set_schedule_mode(self, enabled: bool) -> None:
+        """Enable or disable the mower's scheduled operating mode."""
+        await self._async_send_attribute(
+            message_id=SCHEDULE_MODE_MESSAGE_ID,
+            attribute_id=15,
+            name="Mode",
+            attribute_type="ENUM",
+            value="2" if enabled else "0",
         )
 
     async def _async_send_attribute(

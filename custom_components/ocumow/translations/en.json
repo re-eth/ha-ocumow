@@ -44,6 +44,9 @@
       "reset_blade_time": {"name": "Reset blade time"}
     },
     "lawn_mower": {"mower": {"name": null}},
+    "switch": {
+      "schedule_mode": {"name": "Schedule mode"}
+    },
     "sensor": {
       "battery": {"name": "Battery"},
       "status": {"name": "Status"},

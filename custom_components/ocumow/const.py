@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 DOMAIN = "ocumow"
-PLATFORMS = ["binary_sensor", "button", "lawn_mower", "sensor"]
+PLATFORMS = ["binary_sensor", "button", "lawn_mower", "sensor", "switch"]
 
 CONF_DEVICE_ID = "device_id"
 CONF_DEVICE_NAME = "device_name"
@@ -43,12 +43,14 @@ DEVICE_LIVE_PROPERTIES = (
     "Fault",
     "ConnectStationStates",
     "BatteryStates",
+    "Mode",
 )
 
 COMMAND_PAUSE = "0"
 COMMAND_START = "1"
 COMMAND_DOCK = "2"
 RESET_DATA_MESSAGE_ID = 1001
+SCHEDULE_MODE_MESSAGE_ID = 1000
 
 COMMAND_MESSAGE_IDS = {
     COMMAND_PAUSE: 1012,

@@ -72,6 +72,7 @@ The exact entities available depend on the information returned by the mower.
 | Total travelled distance | Overall distance reported by the mower |
 | Working distance | Separate working-distance counter exposed by the cloud |
 | Schedules | Enabled weekly mowing periods; full details are also stored in its attributes |
+| Schedule mode | Shows whether automatic scheduled mowing is enabled and allows it to be switched on or off |
 | Next cut | Next enabled schedule start, calculated in the Home Assistant timezone |
 | Rain sensor enabled | Whether the mower's rain-sensor setting is enabled |
 | Rain delay | Configured delay before mowing resumes after rain |
@@ -95,7 +96,7 @@ The blade-time reset is also cloud controlled. The statistics endpoint can
 lag behind a successful reset acknowledgement, so its displayed value may
 take a short time to update.
 
-Schedules and rain settings are currently read-only in Home Assistant.
+Individual schedule times and rain settings are currently read-only in Home Assistant.
 
 ## Troubleshooting
 
@@ -124,7 +125,7 @@ diagnostics file before sharing it publicly.
   firmware versions.
 - The integration currently uses the European cloud configuration recovered
   from the app.
-- Schedule and rain-setting changes must still be made in the OcuMow app.
+- Schedule-time and rain-setting changes must still be made in the OcuMow app.
 
 ## Development
 
