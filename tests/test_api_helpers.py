@@ -19,6 +19,8 @@ from custom_components.ocumow.const import (
     COMMAND_PAUSE,
     COMMAND_START,
     RESET_DATA_MESSAGE_ID,
+    RAIN_SETTINGS_MESSAGE_ID,
+    SCHEDULE_MESSAGE_ID,
     SCHEDULE_MODE_MESSAGE_ID,
 )
 
@@ -43,6 +45,8 @@ def test_command_message_ids_match_apk() -> None:
         COMMAND_DOCK: 1014,
     }
     assert RESET_DATA_MESSAGE_ID == 1001
+    assert RAIN_SETTINGS_MESSAGE_ID == 1004
+    assert SCHEDULE_MESSAGE_ID == 1010
     assert SCHEDULE_MODE_MESSAGE_ID == 1000
 
 

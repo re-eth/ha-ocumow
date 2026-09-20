@@ -25,8 +25,9 @@ robot mowers.
 - Total travelled distance and working distance
 - Mainboard and battery temperatures
 - Signal quality, firmware, fault description, and cloud connection history
-- Weekly schedule summary and calculated next cut
-- Rain-sensor enabled state and configured post-rain delay
+- Weekly schedule summary, calculated next cut, and a calendar for adding or
+  deleting weekly mowing periods
+- Rain-sensor on/off control and adjustable 0–9 hour post-rain delay
 - Online connectivity and stopped-state binary sensors
 - A button to reset the blade-time counter
 - Diagnostics downloads with credentials, device secrets and tokens redacted
@@ -72,10 +73,13 @@ The exact entities available depend on the information returned by the mower.
 | Total travelled distance | Overall distance reported by the mower |
 | Working distance | Separate working-distance counter exposed by the cloud |
 | Schedules | Enabled weekly mowing periods; full details are also stored in its attributes |
+| Mowing schedule | Calendar containing the repeating weekly cuts; use it to add or delete mowing periods |
 | Schedule mode | Shows whether automatic scheduled mowing is enabled and allows it to be switched on or off |
-| Next cut | Next enabled schedule start, calculated in the Home Assistant timezone |
+| Next cut | Next enabled schedule start, calculated in the Home Assistant timezone; clears while Schedule mode is off |
 | Rain sensor enabled | Whether the mower's rain-sensor setting is enabled |
 | Rain delay | Configured delay before mowing resumes after rain |
+| Rain sensor | Enables or disables the mower's rain response |
+| Rain delay setting | Sets the delay before mowing resumes, from 0 to 9 hours |
 | Online | Whether the mower is connected to the vendor cloud |
 | Stopped | Raw stopped flag reported by the mower |
 | Fault | Human-readable fault description, while retaining unknown numeric codes |
@@ -96,7 +100,11 @@ The blade-time reset is also cloud controlled. The statistics endpoint can
 lag behind a successful reset acknowledgement, so its displayed value may
 take a short time to update.
 
-Individual schedule times and rain settings are currently read-only in Home Assistant.
+The **Mowing schedule** calendar treats entries as repeating weekly periods.
+Creating an event adds that weekday and time to the mower; deleting any
+occurrence removes the complete weekly period. The mower supports up to two
+periods per weekday. Use **Schedule mode** to enable or disable the complete
+schedule without deleting its periods.
 
 ## Troubleshooting
 
@@ -125,7 +133,8 @@ diagnostics file before sharing it publicly.
   firmware versions.
 - The integration currently uses the European cloud configuration recovered
   from the app.
-- Schedule-time and rain-setting changes must still be made in the OcuMow app.
+- Schedule and rain controls use an app-derived, unofficial protocol; verify
+  their behaviour carefully if using a mower model other than the OcuMow 18B.
 
 ## Development
 

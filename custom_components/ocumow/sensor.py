@@ -467,7 +467,7 @@ class OcuMowScheduleSensor(OcuMowEntity, SensorEntity):
 
 
 class OcuMowNextCutSensor(OcuMowEntity, SensorEntity):
-    """Display the next enabled schedule start."""
+    """Display the next schedule start when scheduled mowing is enabled."""
 
     _attr_translation_key = "next_cut"
     _attr_icon = "mdi:calendar-arrow-right"
@@ -479,4 +479,18 @@ class OcuMowNextCutSensor(OcuMowEntity, SensorEntity):
 
     @property
     def native_value(self) -> datetime | None:
+        mode = self.device.get("Mode")
+        if mode is not None and str(mode).strip() != "2":
+            return None
         return next_scheduled_cut(self.device.get("Schedule"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Explain an empty timestamp when the schedule is switched off."""
+        mode = self.device.get("Mode")
+        return {
+            "schedule_enabled": mode is not None and str(mode).strip() == "2",
+            "reason": "Schedule off"
+            if mode is not None and str(mode).strip() != "2"
+            else None,
+        }

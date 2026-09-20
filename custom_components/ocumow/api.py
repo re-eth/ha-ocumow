@@ -26,6 +26,8 @@ from .const import (
     DEVICE_LIVE_PROPERTIES,
     DEVICE_STATISTIC_PROPERTIES,
     RESET_DATA_MESSAGE_ID,
+    RAIN_SETTINGS_MESSAGE_ID,
+    SCHEDULE_MESSAGE_ID,
     SCHEDULE_MODE_MESSAGE_ID,
 )
 
@@ -348,6 +350,66 @@ class OcuMowApi:
             value="2" if enabled else "0",
         )
 
+    async def async_set_rain_settings(self, enabled: bool, delay_hours: int) -> None:
+        """Set rain sensing and its post-rain delay as one atomic setting."""
+        await self._async_send_attribute(
+            message_id=RAIN_SETTINGS_MESSAGE_ID,
+            attribute_id=21,
+            name="RainSet",
+            attribute_type="STRUCT",
+            value=[
+                {"id": 1, "type": "BOOL", "value": str(enabled).lower()},
+                {"id": 2, "type": "INT", "value": str(delay_hours)},
+            ],
+        )
+
+    async def async_set_schedule(self, schedules: list[dict[str, int]]) -> None:
+        """Replace the mower's two-per-day weekly schedule array."""
+        slots: dict[int, list[dict[str, int]]] = {day: [] for day in range(7)}
+        for schedule in schedules:
+            week = int(schedule["week"])
+            if week not in slots or len(slots[week]) >= 2:
+                raise OcuMowApiError("The mower supports at most two schedules per day")
+            slots[week].append(schedule)
+
+        value: list[dict[str, Any]] = []
+        for week in range(7):
+            day_slots = sorted(
+                slots[week], key=lambda item: (item["start_hour"], item["start_minute"])
+            )
+            day_slots.extend(
+                {
+                    "week": week,
+                    "start_hour": 0,
+                    "start_minute": 0,
+                    "end_hour": 0,
+                    "end_minute": 0,
+                }
+                for _ in range(2 - len(day_slots))
+            )
+            for slot in day_slots:
+                value.append(
+                    {
+                        "id": 0,
+                        "type": "STRUCT",
+                        "value": [
+                            {"id": 71, "type": "INT", "value": str(week)},
+                            {"id": 72, "type": "INT", "value": str(slot["start_hour"])},
+                            {"id": 73, "type": "INT", "value": str(slot["start_minute"])},
+                            {"id": 74, "type": "INT", "value": str(slot["end_hour"])},
+                            {"id": 75, "type": "INT", "value": str(slot["end_minute"])},
+                        ],
+                    }
+                )
+
+        await self._async_send_attribute(
+            message_id=SCHEDULE_MESSAGE_ID,
+            attribute_id=14,
+            name="Schedule",
+            attribute_type="ARRAY",
+            value=value,
+        )
+
     async def _async_send_attribute(
         self,
         *,
@@ -355,7 +417,7 @@ class OcuMowApi:
         attribute_id: int,
         name: str,
         attribute_type: str,
-        value: str,
+        value: Any,
     ) -> None:
         """Send one thing-model attribute using the app's WebSocket format."""
         if self._command_device_key is None or self._command_product_key is None:
