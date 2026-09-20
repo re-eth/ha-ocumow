@@ -43,7 +43,7 @@
     "button": {
       "reset_blade_time": {"name": "Reset blade time"}
     },
-    "lawn_mower": {"mower": {"name": null}},
+    "lawn_mower": {"mower": {"name": "Mower"}},
     "calendar": {
       "schedule_calendar": {"name": "Mowing schedule"}
     },
