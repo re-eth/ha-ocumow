@@ -6,12 +6,13 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import OcuMowConfigEntry
-from .api import OcuMowDevice
-from .entity import OcuMowEntity
+from .api import OcuMowDevice, OcuMowError
 from .binary_sensor import cloud_boolean
+from .entity import OcuMowEntity
 from .sensor import nested_value, rain_delay_hours
 
 
@@ -62,7 +63,10 @@ class OcuMowScheduleModeSwitch(OcuMowEntity, SwitchEntity):
 
     async def _async_set_schedule_mode(self, enabled: bool) -> None:
         """Send the app-equivalent mode command and update promptly."""
-        await self.coordinator.api.async_set_schedule_mode(enabled)
+        try:
+            await self.coordinator.api.async_set_schedule_mode(enabled)
+        except OcuMowError as err:
+            raise HomeAssistantError(str(err)) from err
         current = self.coordinator.data
         self.coordinator.async_set_updated_data(
             OcuMowDevice(
@@ -101,5 +105,8 @@ class OcuMowRainSensorSwitch(OcuMowEntity, SwitchEntity):
 
     async def _async_set_enabled(self, enabled: bool) -> None:
         delay = rain_delay_hours(self.device.get("RainSet")) or 0
-        await self.coordinator.api.async_set_rain_settings(enabled, delay)
+        try:
+            await self.coordinator.api.async_set_rain_settings(enabled, delay)
+        except OcuMowError as err:
+            raise HomeAssistantError(str(err)) from err
         await self.coordinator.async_request_refresh()

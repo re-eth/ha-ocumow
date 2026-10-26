@@ -11,9 +11,11 @@ from homeassistant.components.lawn_mower import (
     LawnMowerEntityFeature,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import OcuMowConfigEntry
+from .api import OcuMowError
 from .const import COMMAND_DOCK, COMMAND_PAUSE, COMMAND_START
 from .entity import OcuMowEntity
 
@@ -139,17 +141,26 @@ class OcuMowLawnMower(OcuMowEntity, LawnMowerEntity):
 
     async def async_start_mowing(self) -> None:
         """Start or resume mowing."""
-        await self.coordinator.api.async_send_command(COMMAND_START)
+        try:
+            await self.coordinator.api.async_send_command(COMMAND_START)
+        except OcuMowError as err:
+            raise HomeAssistantError(str(err)) from err
         self._begin_command_refresh(LawnMowerActivity.MOWING)
 
     async def async_pause(self) -> None:
         """Pause mowing."""
-        await self.coordinator.api.async_send_command(COMMAND_PAUSE)
+        try:
+            await self.coordinator.api.async_send_command(COMMAND_PAUSE)
+        except OcuMowError as err:
+            raise HomeAssistantError(str(err)) from err
         self._begin_command_refresh(LawnMowerActivity.PAUSED)
 
     async def async_dock(self) -> None:
         """Return the mower to its charging station."""
-        await self.coordinator.api.async_send_command(COMMAND_DOCK)
+        try:
+            await self.coordinator.api.async_send_command(COMMAND_DOCK)
+        except OcuMowError as err:
+            raise HomeAssistantError(str(err)) from err
         self._begin_command_refresh(LawnMowerActivity.RETURNING)
 
     def _begin_command_refresh(self, activity: LawnMowerActivity) -> None:

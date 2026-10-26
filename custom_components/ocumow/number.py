@@ -5,9 +5,11 @@ from __future__ import annotations
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import OcuMowConfigEntry
+from .api import OcuMowError
 from .binary_sensor import cloud_boolean
 from .entity import OcuMowEntity
 from .sensor import nested_value, rain_delay_hours
@@ -49,5 +51,10 @@ class OcuMowRainDelayNumber(OcuMowEntity, NumberEntity):
         enabled = cloud_boolean(
             nested_value(self.device.get("RainSet"), "RainSwitch")
         )
-        await self.coordinator.api.async_set_rain_settings(bool(enabled), round(value))
+        try:
+            await self.coordinator.api.async_set_rain_settings(
+                bool(enabled), round(value)
+            )
+        except OcuMowError as err:
+            raise HomeAssistantError(str(err)) from err
         await self.coordinator.async_request_refresh()

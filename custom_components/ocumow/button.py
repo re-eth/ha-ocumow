@@ -7,9 +7,11 @@ from typing import Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import OcuMowConfigEntry
+from .api import OcuMowError
 from .entity import OcuMowEntity
 
 
@@ -66,6 +68,9 @@ class OcuMowResetBladeTimeButton(OcuMowEntity, ButtonEntity):
                 self._reset_result = (
                     "Cloud acknowledged reset; blade time has not changed yet"
                 )
+        except OcuMowError as err:
+            self._reset_result = self.coordinator.api.last_command_result or "Failed"
+            raise HomeAssistantError(str(err)) from err
         except Exception:
             self._reset_result = self.coordinator.api.last_command_result or "Failed"
             raise
