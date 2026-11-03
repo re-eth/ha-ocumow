@@ -40,17 +40,14 @@ corresponding property.
 
 ## Installation with HACS
 
-Until this repository is included in the default HACS catalogue, add it as a
-custom repository:
-
 1. Open **HACS**.
-2. Select the three-dot menu in the top-right corner, then
-   **Custom repositories**.
-3. Enter `https://github.com/re-eth/ha-ocumow`.
-4. Select **Integration** and choose **Add**.
-5. Find and install **OcuMow**.
-6. Restart Home Assistant.
-7. Go to **Settings → Devices & services → Add integration → OcuMow**.
+2. Search for **OcuMow** in the integrations catalogue.
+3. Open **OcuMow** and select **Download**.
+4. Restart Home Assistant when prompted.
+5. Go to **Settings → Devices & services → Add integration → OcuMow**.
+
+OcuMow is included in the default HACS catalogue, so adding this GitHub
+repository as a custom repository is no longer required.
 
 The setup form signs in with the same account used by the OcuMow app. The
 integration uses the European cloud endpoint selected by the app. If the
